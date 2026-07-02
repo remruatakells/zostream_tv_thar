@@ -1,0 +1,127 @@
+{
+  "project_info": {
+    "project_number": "164125430857",
+    "firebase_url": "https://zo-stream-f04ea-default-rtdb.firebaseio.com",
+    "project_id": "zo-stream-f04ea",
+    "storage_bucket": "zo-stream-f04ea.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:164125430857:android:06d5e7a1ac96ce7c94db98",
+        "android_client_info": {
+          "package_name": "com.buannel.studio.pvt.ltd.zostream"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "164125430857-lq4v42qcj520c5n9sj7enocgrjetue6r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArmtRzJ0X-u5ECPGeAXt8hEH0P5V4_bDA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "164125430857-lq4v42qcj520c5n9sj7enocgrjetue6r.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:164125430857:android:346eec4d15015c2494db98",
+        "android_client_info": {
+          "package_name": "com.buannel.studio.zostream.remote"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "164125430857-lq4v42qcj520c5n9sj7enocgrjetue6r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArmtRzJ0X-u5ECPGeAXt8hEH0P5V4_bDA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "164125430857-lq4v42qcj520c5n9sj7enocgrjetue6r.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:164125430857:android:feff241546159b8494db98",
+        "android_client_info": {
+          "package_name": "com.buannel.studio.zostreamtv"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "164125430857-lq4v42qcj520c5n9sj7enocgrjetue6r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArmtRzJ0X-u5ECPGeAXt8hEH0P5V4_bDA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "164125430857-lq4v42qcj520c5n9sj7enocgrjetue6r.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:164125430857:android:5c23c879ec1127d494db98",
+        "android_client_info": {
+          "package_name": "com.buannel.studio.zsdata"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "164125430857-lq4v42qcj520c5n9sj7enocgrjetue6r.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArmtRzJ0X-u5ECPGeAXt8hEH0P5V4_bDA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "164125430857-lq4v42qcj520c5n9sj7enocgrjetue6r.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
