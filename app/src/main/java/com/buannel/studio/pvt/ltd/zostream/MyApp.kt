@@ -10,7 +10,7 @@ class MyApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // Initialize Retrofit API
+        // API is initialized only after official verification returns api_base_url.
         Api.init(this)
     }
 }

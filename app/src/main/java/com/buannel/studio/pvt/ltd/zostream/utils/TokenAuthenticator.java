@@ -39,9 +39,6 @@ public class TokenAuthenticator implements Authenticator {
             String refreshToken = prefs.getString("refresh_token", null);
             String currentToken = prefs.getString("access_token", null);
 
-            Log.d("ZO_TOKEN", "Current Access Token: " + currentToken);
-            Log.d("ZO_TOKEN", "Refresh Token: " + refreshToken);
-
             String requestToken = response.request().header("Authorization");
 
             if (requestToken != null && !requestToken.equals(AuthHeader.bearer(currentToken))) {
@@ -68,8 +65,6 @@ public class TokenAuthenticator implements Authenticator {
 
                     String newAccessToken = res.body().getAccessToken();
                     String newRefreshToken = res.body().getRefreshToken();
-
-                    Log.d("ZO_TOKEN", "New Access Token: " + newAccessToken);
 
                     prefs.edit()
                             .putString("access_token", newAccessToken)

@@ -154,11 +154,23 @@ public class HomeRepository {
             if (duration != null) {
                 movie.watchDuration = duration > Integer.MAX_VALUE ? Integer.MAX_VALUE : duration.intValue();
             }
-            applyEpisodeTitle(movie, item.getEpisode());
+            Episode episode = item.getEpisode();
+            applyEpisodeCover(movie, episode);
+            applyEpisodeTitle(movie, episode);
             movies.add(movie);
         }
 
         return movies;
+    }
+
+    private void applyEpisodeCover(Movie movie, Episode episode) {
+        if (episode == null || episode.thumbnail == null || episode.thumbnail.trim().isEmpty()) {
+            return;
+        }
+
+        String episodeCover = episode.thumbnail.trim();
+        movie.coverImg = episodeCover;
+        movie.poster = episodeCover;
     }
 
     private void applyEpisodeTitle(Movie movie, Episode episode) {

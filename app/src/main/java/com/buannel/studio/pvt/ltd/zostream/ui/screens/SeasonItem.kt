@@ -21,6 +21,7 @@ import com.buannel.studio.pvt.ltd.zostream.ui.components.tvFocusedItemBorder
 fun SeasonItem(
     season: Season,
     isSelected: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
 
@@ -45,7 +46,7 @@ fun SeasonItem(
 
         border = tvFocusedItemBorder(),
 
-        modifier = Modifier
+        modifier = modifier
             .padding(end = 10.dp)
     ) {
 

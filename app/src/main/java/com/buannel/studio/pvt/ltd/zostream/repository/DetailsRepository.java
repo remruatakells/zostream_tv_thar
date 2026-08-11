@@ -25,7 +25,7 @@ public class DetailsRepository {
     ) {
 
         Call<MovieDetailsResponse> call =
-                Api.getApi().getDetails(AuthHeader.bearer(accessToken), userId, deviceId, "tv", type, movieId);
+                Api.getApi().getDetails(AuthHeader.bearer(accessToken), movieId, userId, deviceId, "tv", type, movieId);
 
         call.enqueue(new Callback<MovieDetailsResponse>() {
             @Override

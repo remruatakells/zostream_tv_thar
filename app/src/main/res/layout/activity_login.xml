@@ -147,21 +147,46 @@
                     android:gravity="center"
                     android:orientation="vertical">
 
-                    <EditText
-                        android:id="@+id/phoneInput"
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="45dp"
-                        android:textSize="17sp"
-                        android:paddingStart="12dp"
-                        android:paddingEnd="12dp"
-                        android:inputType="number"
-                        android:maxLines="1"
-                        android:maxLength="10"
                         android:layout_marginBottom="14dp"
-                        android:gravity="center_vertical"
                         android:background="@drawable/item_selector"
-                        android:hint="Phone no"
-                        tools:ignore="TextFields" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/countryCodePicker"
+                            android:layout_width="62dp"
+                            android:layout_height="match_parent"
+                            android:background="@drawable/country_code_selector"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:focusableInTouchMode="true"
+                            android:gravity="center"
+                            android:nextFocusRight="@id/phoneInput"
+                            android:text="+91"
+                            android:textColor="@color/black"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <EditText
+                            android:id="@+id/phoneInput"
+                            android:nextFocusLeft="@id/countryCodePicker"
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@android:color/transparent"
+                            android:gravity="center_vertical"
+                            android:hint="Phone no"
+                            android:inputType="number"
+                            android:maxLength="15"
+                            android:maxLines="1"
+                            android:paddingStart="6dp"
+                            android:paddingEnd="12dp"
+                            android:textSize="17sp"
+                            tools:ignore="TextFields" />
+                    </LinearLayout>
 
                     <EditText
                         android:id="@+id/otpInput"

@@ -3,7 +3,6 @@ package com.buannel.studio.pvt.ltd.zostream.ui.player
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,6 +17,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.Text
 import com.buannel.studio.pvt.ltd.zostream.ui.screens.TvLoader
+import com.buannel.studio.pvt.ltd.zostream.ui.screens.tvDpadClick
 
 @Composable
 fun PlayerScreen(
@@ -132,7 +132,7 @@ fun PlayerScreen(
                 .padding(top = 60.dp, start = 16.dp)
                 .background(Color(0x66000000))
                 .padding(10.dp)
-                .clickable {
+                .tvDpadClick {
                     onBack()
                 }
         )

@@ -8,12 +8,12 @@ public final class AuthHeader {
 
     public static String bearer(String accessToken) {
         if (accessToken == null) {
-            return null;
+            return "";
         }
 
         String token = accessToken.trim();
         if (token.isEmpty()) {
-            return null;
+            return "";
         }
 
         if (token.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {

@@ -11,11 +11,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.layout.ContentScale
@@ -32,8 +36,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.tv.material3.Card
-import androidx.tv.material3.CardDefaults
 import com.buannel.studio.pvt.ltd.zostream.model.Episode
 import com.buannel.studio.pvt.ltd.zostream.model.Movie
 import com.buannel.studio.pvt.ltd.zostream.model.Subscription
@@ -44,6 +46,7 @@ import com.buannel.studio.pvt.ltd.zostream.utils.SessionManager
 @Composable
 fun DetailsScreen(
     movieId: String,
+    refreshKey: Long = 0L,
     accessToken: String,
     userId: String,
     deviceId: String,
@@ -52,7 +55,6 @@ fun DetailsScreen(
 ) {
     val viewModel: DetailsViewModel = viewModel()
     val subscription = viewModel.subscription.value
-    val ppvDetails = viewModel.ppv.value
     val movie = viewModel.movie.value
     val seasons = viewModel.seasons.value
     val episodes = viewModel.episodes.value
@@ -61,13 +63,36 @@ fun DetailsScreen(
 
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     val hasAccess = subscription?.isActive == true
-    val hasPPV = ppvDetails?.isRented == true
     val context = LocalContext.current
 
     var selectedMovieId by remember(movieId) { mutableStateOf(movieId) }
+    var episodeRangeIndex by remember { mutableStateOf(0) }
+    val firstSeasonFocusRequester = remember { FocusRequester() }
+    val firstEpisodeRangeFocusRequester = remember { FocusRequester() }
+    val firstEpisodeFocusRequester = remember { FocusRequester() }
+    val primaryActionFocusRequester = remember { FocusRequester() }
+    val episodesPerRange = 20
+    val episodeRangeCount = remember(episodes) {
+        if (episodes.isEmpty()) 0 else ((episodes.size + episodesPerRange - 1) / episodesPerRange)
+    }
+    val visibleEpisodes = remember(episodes, episodeRangeIndex) {
+        val start = (episodeRangeIndex * episodesPerRange).coerceAtMost(episodes.size)
+        val end = (start + episodesPerRange).coerceAtMost(episodes.size)
+        episodes.subList(start, end)
+    }
 
-    LaunchedEffect(selectedMovieId) {
+    LaunchedEffect(selectedMovieId, refreshKey) {
         viewModel.loadData(accessToken, userId, deviceId, selectedMovieId)
+    }
+
+    LaunchedEffect(viewModel.selectedSeason.value?.id, episodes.size) {
+        episodeRangeIndex = 0
+    }
+
+    LaunchedEffect(episodeRangeCount) {
+        if (episodeRangeCount > 0 && episodeRangeIndex >= episodeRangeCount) {
+            episodeRangeIndex = episodeRangeCount - 1
+        }
     }
 
     if (loading) {
@@ -76,6 +101,10 @@ fun DetailsScreen(
     }
 
     movie?.let { currentMovie ->
+        LaunchedEffect(currentMovie.id, refreshKey) {
+            primaryActionFocusRequester.requestFocus()
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -109,15 +138,11 @@ fun DetailsScreen(
             ) {
 
                 Row(modifier = Modifier.padding(horizontal = 40.dp)) {
-                    Card(
-                        onClick = {},
-                        shape = CardDefaults.shape(RoundedCornerShape(8.dp)),
-                        scale = CardDefaults.scale(focusedScale = 1.1f),
-                        colors = CardDefaults.colors(
-                            containerColor = Color.DarkGray,
-                            focusedContainerColor = Color.Gray
-                        ),
-                        modifier = Modifier.size(150.dp, 230.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(150.dp, 230.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.DarkGray)
                     ) {
                         AsyncImage(
                             model = currentMovie.poster,
@@ -162,13 +187,24 @@ fun DetailsScreen(
                         Row {
                             val isOwner = SessionManager.getIsDeviceOwner(context)
 
-                            // use Season 1 -> Episode 1 as the source of truth for season-wide access
-                            val firstSeason = seasons.firstOrNull()
-                            val firstEpisode = firstSeason?.episodes?.firstOrNull()
-
-                            // --- UPDATED LOGIC ---
-                            // Check if the season should behave as PPV, Premium, or Free based on Ep 1
+                            // Match iOS: the series hero always represents Season 1, Episode 1.
+                            val firstSeason = seasons.firstOrNull { it.seasonNumber == 1 }
+                                ?: seasons.firstOrNull()
+                            val firstEpisode = firstSeason
+                                ?.episodes
+                                ?.firstOrNull { it.episodeNumber == 1 }
+                                ?: firstSeason?.episodes?.minByOrNull {
+                                    if (it.episodeNumber > 0) it.episodeNumber else Int.MAX_VALUE
+                                }
                             val seasonRequiresPpv = currentMovie.isSeason && firstEpisode?.isPayPerView == true
+                            val primaryRental = firstEpisode?.let { episode ->
+                                viewModel.rentalStatus(
+                                    type = "episode",
+                                    contentId = episode.id,
+                                    seasonId = episode.seasonId.ifBlank { firstSeason?.id.orEmpty() }
+                                )
+                            }
+                            val hasPrimaryRental = primaryRental?.isRented == true
 
                             val isFree = if (currentMovie.isSeason && firstEpisode != null) {
                                 !firstEpisode.isPremium && !firstEpisode.isPayPerView
@@ -178,12 +214,15 @@ fun DetailsScreen(
                             // ---------------------
 
                             val canWatch = when {
-                                isFree -> true // ✅ Ep 1 is free or Movie is free
+                                isFree -> true
 
-                                currentMovie.isSeason && seasonRequiresPpv -> hasPPV
+                                currentMovie.isSeason && seasonRequiresPpv -> hasPrimaryRental
                                 currentMovie.isSeason && !seasonRequiresPpv -> hasAccess
 
-                                currentMovie.isPayPerView -> hasPPV && isOwner
+                                currentMovie.isPayPerView -> viewModel.rentalStatus(
+                                    type = "movie",
+                                    contentId = currentMovie.id
+                                )?.isRented == true
 
                                 else -> hasAccess
                             }
@@ -191,10 +230,10 @@ fun DetailsScreen(
                             val buttonText = when {
                                 isFree -> "Watch Now"
 
-                                currentMovie.isSeason && seasonRequiresPpv -> if (hasPPV) "Watch Now" else "Rent Season"
+                                currentMovie.isSeason && seasonRequiresPpv -> if (hasPrimaryRental) "Watch Now" else "Rent Season"
                                 currentMovie.isSeason -> if (hasAccess) "Watch Now" else "Subscribe"
 
-                                currentMovie.isPayPerView -> if (hasPPV) "Watch Now" else "Rent Now"
+                                currentMovie.isPayPerView -> if (canWatch) "Watch Now" else "Rent Now"
 
                                 hasAccess -> "Watch Now"
                                 else -> "Subscribe"
@@ -202,6 +241,7 @@ fun DetailsScreen(
 
                             TvButton(
                                 text = buttonText,
+                                modifier = Modifier.focusRequester(primaryActionFocusRequester),
                                 onClick = {
                                     when {
                                         canWatch -> {
@@ -232,8 +272,8 @@ fun DetailsScreen(
 
                                         currentMovie.isSeason && seasonRequiresPpv -> {
                                             if (isOwner) {
-                                                // Use episode ID for PPV rental of a season
-                                                onQrPayment(firstEpisode?.id ?: "", true, subscription?.id, "episode")
+                                                // The mobile QR flow offers both episode and full-season rental.
+                                                onQrPayment(firstEpisode.id, true, subscription?.id, "episode")
                                             } else {
                                                 FullScreenErrorDialog.show(
                                                     context,
@@ -248,7 +288,7 @@ fun DetailsScreen(
                                         currentMovie.isPayPerView || (!hasAccess && !isFree) -> {
                                             if (isOwner) {
                                                 val isPpv = currentMovie.isPayPerView
-                                                onQrPayment(currentMovie.id, isPpv, subscription?.id, if(currentMovie.isSeason) "episode" else "movie")
+                                                onQrPayment(currentMovie.id, isPpv, subscription?.id, "movie")
                                             } else {
                                                 FullScreenErrorDialog.show(
                                                     context,
@@ -275,30 +315,109 @@ fun DetailsScreen(
                         contentPadding = PaddingValues(horizontal = 24.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(seasons) { season ->
+                        itemsIndexed(seasons) { index, season ->
                             SeasonItem(
                                 season = season,
                                 isSelected = season.id == viewModel.selectedSeason.value?.id,
-                                onClick = { viewModel.selectSeason(season) }
+                                modifier = Modifier
+                                    .then(
+                                        if (index == 0) {
+                                            Modifier.focusRequester(firstSeasonFocusRequester)
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
+                                    .focusProperties {
+                                        if (episodeRangeCount > 1) {
+                                            down = firstEpisodeRangeFocusRequester
+                                        } else if (visibleEpisodes.isNotEmpty()) {
+                                            down = firstEpisodeFocusRequester
+                                        }
+                                    },
+                                onClick = {
+                                    viewModel.selectSeason(season)
+                                    viewModel.preloadSeasonRentalStatuses(
+                                        accessToken = accessToken,
+                                        userId = userId,
+                                        season = season
+                                    )
+                                    episodeRangeIndex = 0
+                                }
                             )
                         }
                     }
 
                     Spacer(Modifier.height(20.dp))
 
+                    if (episodeRangeCount > 1) {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(episodeRangeCount) { index ->
+                                val start = index * episodesPerRange + 1
+                                val end = ((index + 1) * episodesPerRange).coerceAtMost(episodes.size)
+                                TvButton(
+                                    text = if (index == episodeRangeIndex) "✓ $start–$end" else "$start–$end",
+                                    modifier = Modifier
+                                        .then(
+                                            if (index == 0) {
+                                                Modifier.focusRequester(firstEpisodeRangeFocusRequester)
+                                            } else {
+                                                Modifier
+                                            }
+                                        )
+                                        .focusProperties {
+                                            if (seasons.isNotEmpty()) {
+                                                up = firstSeasonFocusRequester
+                                            }
+                                            if (visibleEpisodes.isNotEmpty()) {
+                                                down = firstEpisodeFocusRequester
+                                            }
+                                        },
+                                    onClick = { episodeRangeIndex = index }
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(20.dp))
+                    }
+
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 24.dp),
                     ) {
-                        items(episodes) { episode ->
+                        itemsIndexed(visibleEpisodes) { index, episode ->
                             EpisodeItem(
                                 episode = episode,
+                                focusModifier = Modifier
+                                    .then(
+                                        if (index == 0) {
+                                            Modifier.focusRequester(firstEpisodeFocusRequester)
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
+                                    .focusProperties {
+                                        up = if (episodeRangeCount > 1) {
+                                            firstEpisodeRangeFocusRequester
+                                        } else if (seasons.isNotEmpty()) {
+                                            firstSeasonFocusRequester
+                                        } else {
+                                            FocusRequester.Default
+                                        }
+                                    },
                                 onClick = {
-                                    onPlay(
-                                        currentMovie,
-                                        episode,
-                                        episode.seasonId,
-                                        subscription,
-                                        "episode"
+                                    handleEpisodeSelection(
+                                        context = context,
+                                        viewModel = viewModel,
+                                        accessToken = accessToken,
+                                        userId = userId,
+                                        movie = currentMovie,
+                                        episode = episode,
+                                        subscription = subscription,
+                                        isOwner = SessionManager.getIsDeviceOwner(context),
+                                        onPlay = onPlay,
+                                        onQrPayment = onQrPayment
                                     )
                                 }
                             )
@@ -330,6 +449,68 @@ fun DetailsScreen(
             }
         }
     }
+}
+
+private fun handleEpisodeSelection(
+    context: Context,
+    viewModel: DetailsViewModel,
+    accessToken: String,
+    userId: String,
+    movie: Movie,
+    episode: Episode,
+    subscription: Subscription?,
+    isOwner: Boolean,
+    onPlay: (Movie, Episode?, String?, Subscription?, String) -> Unit,
+    onQrPayment: (String, Boolean?, Int?, String?) -> Unit
+) {
+    val seasonId = episode.seasonId.ifBlank {
+        viewModel.selectedSeason.value?.id.orEmpty()
+    }
+    val playEpisode = {
+        onPlay(movie, episode, seasonId, subscription, "episode")
+    }
+
+    if (episode.isPremium && !episode.isPayPerView && subscription?.isActive != true) {
+        if (isOwner) {
+            onQrPayment(movie.id, false, subscription?.id, "movie")
+        } else {
+            showPurchaseRestriction(context, "subscribe")
+        }
+        return
+    }
+
+    if (!episode.isPayPerView) {
+        playEpisode()
+        return
+    }
+
+    viewModel.checkPpvRental(
+        accessToken = accessToken,
+        userId = userId,
+        contentId = episode.id,
+        seasonId = seasonId,
+        type = "episode",
+        force = true
+    ) { status ->
+        if (status?.isRented == true) {
+            playEpisode()
+        } else if (isOwner) {
+            // Scanning this QR presents episode and full-season options on mobile.
+            onQrPayment(episode.id, true, subscription?.id, "episode")
+        } else {
+            showPurchaseRestriction(context, "rent this episode")
+        }
+    }
+}
+
+private fun showPurchaseRestriction(context: Context, action: String) {
+    FullScreenErrorDialog.show(
+        context,
+        "Access Restricted",
+        "Only the account owner device can $action.",
+        true,
+        {}
+    )
 }
 
 @Composable

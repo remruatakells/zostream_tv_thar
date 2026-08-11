@@ -2,7 +2,8 @@ package com.buannel.studio.pvt.ltd.zostream.ui.screens
 
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
@@ -16,6 +17,7 @@ import androidx.tv.material3.Text
 @Composable
 fun TvButton(
     text: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit = {}
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -38,7 +40,7 @@ fun TvButton(
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .width(160.dp)
             .height(45.dp)
             .graphicsLayer {
@@ -55,8 +57,7 @@ fun TvButton(
                 shape = RoundedCornerShape(20.dp)
             )
             .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable { onClick() },
+            .tvDpadClick { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Text(

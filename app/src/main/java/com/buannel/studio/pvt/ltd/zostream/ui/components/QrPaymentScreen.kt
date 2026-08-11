@@ -28,6 +28,7 @@ import androidx.tv.material3.Glow
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.buannel.studio.pvt.ltd.zostream.utils.QRUtils
+import com.buannel.studio.pvt.ltd.zostream.utils.SessionManager
 import com.buannel.studio.pvt.ltd.zostream.viewmodel.QrViewModel
 
 @Composable
@@ -42,6 +43,7 @@ fun QrPaymentScreenUI(
 ) {
 
     val context = LocalContext.current
+    val isOwnerDevice = SessionManager.getIsDeviceOwner(context)
 
     val qrUrl = viewModel.qrToken
     val timerText = viewModel.timerText
@@ -49,14 +51,16 @@ fun QrPaymentScreenUI(
 
     // ✅ AUTO CREATE QR
     LaunchedEffect(Unit) {
-        viewModel.createQr(
-            context = context,
-            isPpv = isPpv,
-            movieId = movieId,
-            amount = amount,
-            contentType = contentType,
-            subscriptionId = subscriptionId
-        )
+        if (isOwnerDevice) {
+            viewModel.createQr(
+                context = context,
+                isPpv = isPpv,
+                movieId = movieId,
+                amount = amount,
+                contentType = contentType,
+                subscriptionId = subscriptionId
+            )
+        }
     }
 
     // ✅ AUTO NAVIGATE AFTER SUCCESS
@@ -103,6 +107,11 @@ fun QrPaymentScreenUI(
                     ) {
 
                         when {
+                            !isOwnerDevice -> Text(
+                                "Only the account owner can subscribe or rent content.",
+                                color = Color.Black
+                            )
+
                             loading -> Text("Loading...", color = Color.Black)
 
                             qrUrl != null -> {
@@ -130,7 +139,14 @@ fun QrPaymentScreenUI(
                                             text = "Retry",
                                             autoFocus = true
                                         ) {
-                                            viewModel.createQr(context)
+                                            viewModel.createQr(
+                                                context = context,
+                                                isPpv = isPpv,
+                                                movieId = movieId,
+                                                amount = amount,
+                                                contentType = contentType,
+                                                subscriptionId = subscriptionId
+                                            )
                                         }
                                     }
                                 }

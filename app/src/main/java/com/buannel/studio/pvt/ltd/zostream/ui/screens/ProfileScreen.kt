@@ -4,8 +4,6 @@ import android.app.Activity
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -56,8 +54,8 @@ import retrofit2.Response
 @Composable
 fun ProfileScreen() {
     val context = LocalContext.current
-    val userId = SessionManager.getUserId(context)
-    val accessToken = SessionManager.getAccessToken(context)
+    val userId = SessionManager.getUserId(context).orEmpty()
+    val accessToken = SessionManager.getAccessToken(context).orEmpty()
 
     var user by remember { mutableStateOf<User?>(null) }
     var parentalMode by remember {
@@ -72,6 +70,13 @@ fun ProfileScreen() {
     LaunchedEffect(userId, accessToken) {
         isLoading = true
         errorMessage = null
+
+        if (userId.isBlank() || accessToken.isBlank()) {
+            isLoading = false
+            user = null
+            errorMessage = "Please sign in again to view your profile."
+            return@LaunchedEffect
+        }
 
         Api.getApi().findUser(
             AuthHeader.bearer(accessToken),
@@ -271,8 +276,7 @@ private fun SettingsItem(
                 shape = shape
             )
             .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable { onClick() }
+            .tvDpadClick { onClick() }
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -463,8 +467,7 @@ private fun ProfileActionButton(
                 shape = RoundedCornerShape(8.dp)
             )
             .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable { onClick() },
+            .tvDpadClick { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Text(

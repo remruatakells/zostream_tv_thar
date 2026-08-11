@@ -102,6 +102,10 @@ public class SessionManager {
 
     // ✅ Logout Function
     public static void logout(Activity activity) {
+        logoutWithReason(activity, null);
+    }
+
+    public static void logoutWithReason(Activity activity, String reason) {
 
         SharedPreferences prefs =
                 activity.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
@@ -113,6 +117,9 @@ public class SessionManager {
         Intent intent = new Intent(activity, LoginActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK |
                 Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        if (reason != null && !reason.trim().isEmpty()) {
+            intent.putExtra("login_notice", reason.trim());
+        }
 
         activity.startActivity(intent);
         activity.finish();

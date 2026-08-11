@@ -18,11 +18,13 @@ import com.buannel.studio.pvt.ltd.zostream.ui.components.tvFocusedItemBorder
 @Composable
 fun EpisodeItem(
     episode: Episode,
+    modifier: Modifier = Modifier,
+    focusModifier: Modifier = Modifier,
     onClick: (Episode) -> Unit = {}
 ) {
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .width(150.dp)
             .padding(end = 12.dp)
     ) {
@@ -30,7 +32,7 @@ fun EpisodeItem(
         // 🔥 TV Surface (same as MovieCard)
         Surface(
             onClick = { onClick(episode) },
-            modifier = Modifier
+            modifier = focusModifier
                 .padding(8.dp)
                 .widthIn(max = 320.dp)
                 .aspectRatio(16f / 9f),

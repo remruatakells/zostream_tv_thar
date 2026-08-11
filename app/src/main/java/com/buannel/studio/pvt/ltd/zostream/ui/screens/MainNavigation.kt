@@ -4,8 +4,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -195,8 +193,7 @@ private fun MainNavigationItem(
             .background(backgroundColor)
             .border(2.dp, borderColor, RoundedCornerShape(8.dp))
             .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable { onClick() }
+            .tvDpadClick { onClick() }
             .padding(horizontal = if (expanded) 18.dp else 0.dp),
         contentAlignment = if (expanded) Alignment.CenterStart else Alignment.Center
     ) {

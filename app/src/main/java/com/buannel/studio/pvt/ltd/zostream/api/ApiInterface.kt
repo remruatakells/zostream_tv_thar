@@ -28,31 +28,31 @@ import retrofit2.http.Query
 
 interface ApiInterface {
 
-    @POST("api/v3.0/request-otp")
+    @POST("api/v4/auth/otp/request")
     fun requestOtp(
         @Body request: OtpRequest?
     ): Call<ApiResponse?>?
 
-    @POST("api/v3.0/verify-otp")
+    @POST("api/v4/auth/otp/verify")
     fun verifyOtp(
         @Body request: OTPVerifyRequest?
     ): Call<ApiResponse?>?
 
     @FormUrlEncoded
-    @POST("api/v3.0/token/refresh")
+    @POST("api/v4/auth/tokens/refresh")
     fun refreshToken(
         @Field("refresh_token") refreshToken: String?,
     ): Call<TokenRefreshResponse>
 
     @FormUrlEncoded
-    @POST("api/v3.0/token/revoke")
+    @POST("api/v4/auth/logout")
     fun revokeToken(
         @Header("Authorization") bearerToken: String,
         @Field("access_token") refreshToken: String?,
     ): Call<ApiResponse>
 
     // ➕ Start Stream
-    @POST("api/v3.0/stream/start")
+    @POST("api/v4/playback/sessions")
     fun startStream(
         @Header("Authorization") bearerToken: String,
         @Header("Device-Token") deviceToken: String,
@@ -60,21 +60,21 @@ interface ApiInterface {
     ): Call<JsonObject>
 
     // ➕ Ping Stream
-    @POST("api/v3.0/stream/ping")
+    @POST("api/v4/playback/sessions/heartbeat")
     fun pingStream(
         @Header("Authorization") bearerToken: String,
         @Header("Device-Token") deviceToken: String,
         @Body body: JsonObject
     ): Call<JsonObject>
 
-    @POST("api/v3.0/stream/stop")
+    @POST("api/v4/playback/sessions/stop")
     fun stopStream(
         @Header("Authorization") bearerToken: String,
         @Header("Device-Token") deviceToken: String,
         @Body body: JsonObject
     ): Call<JsonObject>
 
-    @GET("api/v3.0/movies/home")
+    @GET("api/v4/catalog/home")
     fun homeSection(
         @Header("Authorization") bearerToken: String,
         @Header("X-Mode") mode: String,
@@ -82,9 +82,10 @@ interface ApiInterface {
         @Query("user_id") uid: String,
     ): Call<Map<String, List<Movie>>>
 
-    @GET("api/v3.0/movies/details")
+    @GET("api/v4/catalog/items/{contentId}/details")
     fun getDetails(
         @Header("Authorization") bearerToken: String,
+        @Path("contentId") contentId: String,
         @Query("user_id") userId: String,
         @Query("device_id") deviceId: String,
         @Query("device_type") deviceType: String,
@@ -92,19 +93,19 @@ interface ApiInterface {
         @Query("movie_id") movieId: String,
     ): Call<MovieDetailsResponse>
 
-    @GET("api/v3.0/movies/{num}/seasons")
+    @GET("api/v4/catalog/items/{num}/seasons")
     fun getSeasons(
         @Header("Authorization") bearerToken: String,
         @Path("num") num: Int,
     ): Call<SeasonResponse>
 
-    @GET("api/v3.0/users/find")
+    @GET("api/v4/account")
     fun findUser(
         @Header("Authorization") bearerToken: String,
         @Query("uid") uid: String
     ): Call<UserResponse>
 
-    @GET("api/v3.0/movies/search")
+    @GET("api/v4/catalog/items/search")
     fun searchMovies(
         @Header("X-User-Id") uid: String?,
         @Query("q") query: String?,
@@ -112,22 +113,31 @@ interface ApiInterface {
     ): Call<List<Movie?>?>?
 
 
-    @POST("api/v3.0/qr/qcreate")
+    @POST("api/v4/qr-sessions")
     fun createQr(
         @Body request: QrPaymentRequest
     ): Call<QrLoginResponse>
 
-    @GET("/api/v3.0/movies/alsolike")
+    @POST("api/v4/qr-sessions/payment")
+    fun createPaymentQr(
+        @Header("Authorization") bearerToken: String,
+        @Header("Device-Token") deviceToken: String,
+        @Body request: QrPaymentRequest
+    ): Call<QrLoginResponse>
+
+    @GET("/api/v4/catalog/items/{contentId}/recommendations")
     fun getAlsoLike(
         @Header("Authorization") bearerToken: String,
+        @Path("contentId") contentId: String,
         @Header("X-User-Id") uid: String?,
         @Query("movie_title") title: String?,
         @Query("age_restriction") age: Boolean?
     ): Call<List<Movie?>?>?
 
-    @GET("/api/v3.0/movies/ppv-rental-status")
+    @GET("/api/v4/catalog/items/{contentId}/ppv-status")
     fun checkPayPerViewRental(
         @Header("Authorization") bearerToken: String?,
+        @Path("contentId") pathContentId: String?,
         @Query("type") type: String?,
         @Query("content_id") contentId: String?,
         @Query("season_id") seasonId: String?,
@@ -135,7 +145,7 @@ interface ApiInterface {
         @Query("device_type") deviceType: String?
     ): Call<CheckPpvRentalResponse?>?
 
-    @GET("/api/v3.0/watch-history")
+    @GET("/api/v4/library/history")
     fun getWatchContinue(
         @Header("Authorization") bearerToken: String,
         @Query("userId") userId: String,
@@ -143,7 +153,7 @@ interface ApiInterface {
         @Query("isAgeRestricted") isAgeRestricted: Boolean,
     ): Call<WatchContinueResponse>
 
-    @GET("api/v3.0/movies/filter")
+    @GET("api/v4/catalog/items/filter")
     fun getMovie(
         @Header("Authorization") bearerToken: String,
         @Query("age_restriction") ageRestriction: Boolean,
@@ -154,7 +164,7 @@ interface ApiInterface {
         @Query("page") page: Int?,
     ): Call<MovieFilterResponse>
 
-    @GET("/api/v3.0/banners")
+    @GET("/api/v4/banners")
     fun getBanner(
     ): Call<BannerResponse>
 

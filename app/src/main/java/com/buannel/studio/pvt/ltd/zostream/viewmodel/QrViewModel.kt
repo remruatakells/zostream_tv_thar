@@ -10,6 +10,7 @@ import com.buannel.studio.pvt.ltd.zostream.api.Api
 import com.buannel.studio.pvt.ltd.zostream.request.QrPaymentRequest
 import com.buannel.studio.pvt.ltd.zostream.response.QrLoginResponse
 import com.buannel.studio.pvt.ltd.zostream.utils.DeviceUtils
+import com.buannel.studio.pvt.ltd.zostream.utils.AuthHeader
 import com.buannel.studio.pvt.ltd.zostream.utils.SessionManager
 import com.google.firebase.database.*
 import kotlinx.coroutines.delay
@@ -73,7 +74,11 @@ class QrViewModel : ViewModel() {
             )
         }
 
-        Api.getApi().createQr(request)
+        Api.getApi().createPaymentQr(
+            AuthHeader.bearer(SessionManager.getAccessToken(context)),
+            SessionManager.getUserDeviceId(context),
+            request
+        )
             .enqueue(object : Callback<QrLoginResponse> {
 
                 override fun onResponse(
@@ -112,8 +117,7 @@ class QrViewModel : ViewModel() {
 
                 override fun onDataChange(snapshot: DataSnapshot) {
 
-                    val status = snapshot.child("status")
-                        .getValue(String::class.java)
+                    val status = snapshot.child("status").safeString()
 
                     when (status) {
 
@@ -147,6 +151,15 @@ class QrViewModel : ViewModel() {
                     showRetry = true
                 }
             })
+    }
+
+    private fun DataSnapshot.safeString(): String? {
+        return when (val rawValue = value) {
+            is String -> rawValue
+            is Number -> rawValue.toString()
+            is Boolean -> rawValue.toString()
+            else -> null
+        }
     }
 
     @SuppressLint("DefaultLocale")

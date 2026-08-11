@@ -91,10 +91,24 @@
                     android:focusableInTouchMode="true"
                     android:padding="5dp"
                     android:layout_marginStart="10dp"
-                    android:layout_marginEnd="10dp"
                     android:src="@drawable/settings"
                     android:tint="#FFFFFF"
                     android:nextFocusDown="@id/playlistRecyclerView" />
+
+                <ImageView
+                    android:id="@+id/player_audio_tracks"
+                    android:layout_width="35dp"
+                    android:layout_height="35dp"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/player_option_selector"
+                    android:focusable="true"
+                    android:focusableInTouchMode="true"
+                    android:nextFocusDown="@id/playlistRecyclerView"
+                    android:padding="5dp"
+                    android:src="@drawable/ic_audio_tracks"
+                    android:tint="#FFFFFF"
+                    android:visibility="gone" />
 
             </LinearLayout>
 

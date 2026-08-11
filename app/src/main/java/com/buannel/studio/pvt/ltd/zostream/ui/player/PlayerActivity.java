@@ -118,6 +118,8 @@ public class PlayerActivity extends ComponentActivity {
     private int movieNum;
     private int selectedQualityHeight = 0;
     private float selectedPlaybackSpeed = 1f;
+    private boolean preferredAudioApplied = false;
+    private boolean audioSelectionTouched = false;
     private long watchPosition = 0L;
 
     ArrayList<Season> season;
@@ -125,7 +127,7 @@ public class PlayerActivity extends ComponentActivity {
     ArrayList<Episode> episodes;
     private boolean isEpisode;
 
-    private ImageView speedBtn, qualityBtn;
+    private ImageView speedBtn, qualityBtn, audioTrackBtn;
     private View prevBtn, nextBtn;
     private View prevIcon, nextIcon;
     private View playlistArrow;
@@ -184,6 +186,7 @@ public class PlayerActivity extends ComponentActivity {
 
         speedBtn = playerView.findViewById(R.id.player_speed);
         qualityBtn = playerView.findViewById(R.id.quality_btn);
+        audioTrackBtn = playerView.findViewById(R.id.player_audio_tracks);
         prevBtn = playerView.findViewById(R.id.prev_btn);
         nextBtn = playerView.findViewById(R.id.next_btn);
         prevIcon = playerView.findViewById(R.id.prev_icon);
@@ -197,6 +200,7 @@ public class PlayerActivity extends ComponentActivity {
 
         setupTopControlDownFocus(speedBtn);
         setupTopControlDownFocus(qualityBtn);
+        setupTopControlDownFocus(audioTrackBtn);
         setupTopControlDownFocus(prevIcon);
         setupTopControlDownFocus(nextIcon);
 
@@ -221,6 +225,7 @@ public class PlayerActivity extends ComponentActivity {
         pauPlayBtn.setOnClickListener(v -> pausePlayBtnAction());
         speedBtn.setOnClickListener(v -> showSpeedDialog());
         qualityBtn.setOnClickListener(v -> showQualityDialog());
+        audioTrackBtn.setOnClickListener(v -> showAudioTrackDialog());
         prevBtn.setOnClickListener(v -> prev_btn());
         nextBtn.setOnClickListener(v -> next_btn());
         prevIcon.setOnClickListener(v -> prev_btn());
@@ -701,6 +706,10 @@ public class PlayerActivity extends ComponentActivity {
             player.release();
         }
 
+        preferredAudioApplied = false;
+        audioSelectionTouched = false;
+        updateAudioTrackButtonVisibility();
+
         trackSelector = new DefaultTrackSelector(this);
         player = new ExoPlayer.Builder(this)
                 .setTrackSelector(trackSelector)
@@ -729,6 +738,12 @@ public class PlayerActivity extends ComponentActivity {
             public void onIsPlayingChanged(boolean isPlaying) {
 
                 animatePlayPause(isPlaying);
+            }
+
+            @Override
+            public void onTracksChanged(@NonNull Tracks tracks) {
+                updateAudioTrackButtonVisibility();
+                applyPreferredAudioTrackIfNeeded();
             }
         });
 
@@ -1079,6 +1094,216 @@ public class PlayerActivity extends ComponentActivity {
         showOptionDialog("Video Quality", options);
     }
 
+
+    private void showAudioTrackDialog() {
+        if (player == null || trackSelector == null) {
+            Toast.makeText(this, "Player is not ready", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        List<AudioOption> audioOptions = getAvailableAudioOptions();
+        if (audioOptions.size() <= 1) {
+            Toast.makeText(this, "No other audio tracks available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        ArrayList<DialogOption> options = new ArrayList<>();
+        for (AudioOption option : audioOptions) {
+            options.add(new DialogOption(
+                    getAudioOptionLabel(option),
+                    true,
+                    option.selected,
+                    () -> {
+                        setFixedAudioTrack(option);
+                        Toast.makeText(this, "Audio: " + option.label, Toast.LENGTH_SHORT).show();
+                    }
+            ));
+        }
+
+        showOptionDialog("Audio", options);
+    }
+
+    private void updateAudioTrackButtonVisibility() {
+        if (audioTrackBtn == null) {
+            return;
+        }
+
+        boolean visible = player != null && getAvailableAudioOptions().size() > 1;
+        audioTrackBtn.setVisibility(visible ? VISIBLE : GONE);
+    }
+
+    private List<AudioOption> getAvailableAudioOptions() {
+        ArrayList<AudioOption> options = new ArrayList<>();
+        if (player == null) {
+            return options;
+        }
+
+        int displayIndex = 1;
+        Tracks tracks = player.getCurrentTracks();
+        for (Tracks.Group group : tracks.getGroups()) {
+            if (group.getType() != C.TRACK_TYPE_AUDIO || !group.isSupported()) {
+                continue;
+            }
+
+            for (int trackIndex = 0; trackIndex < group.length; trackIndex++) {
+                if (!group.isTrackSupported(trackIndex)) {
+                    continue;
+                }
+
+                Format format = group.getTrackFormat(trackIndex);
+                String label = getAudioTrackLabel(format, displayIndex);
+                options.add(new AudioOption(
+                        label,
+                        group,
+                        trackIndex,
+                        group.isTrackSelected(trackIndex),
+                        isPreferredMizoAudio(format)
+                ));
+                displayIndex++;
+            }
+        }
+
+        return options;
+    }
+
+    private String getAudioOptionLabel(AudioOption option) {
+        return option.selected ? "✓ " + option.label : option.label;
+    }
+
+    private String getAudioTrackLabel(Format format, int index) {
+        String label = safeTrim(format.label);
+        if (label == null) {
+            label = getLanguageDisplayName(format.language);
+        }
+        if (label == null) {
+            label = "Audio " + index;
+        }
+
+        String details = getAudioTrackDetails(format);
+        if (details != null) {
+            label += " • " + details;
+        }
+
+        return label;
+    }
+
+    private String getLanguageDisplayName(@Nullable String language) {
+        String code = safeTrim(language);
+        if (code == null || "und".equalsIgnoreCase(code)) {
+            return null;
+        }
+
+        String lower = code.toLowerCase(Locale.US);
+        if ("lus".equals(lower) || "miz".equals(lower)) {
+            return "Mizo";
+        }
+
+        Locale locale = Locale.forLanguageTag(code);
+        String display = locale.getDisplayLanguage(Locale.ENGLISH);
+        if (display != null && !display.trim().isEmpty() && !display.equalsIgnoreCase(code)) {
+            return display;
+        }
+
+        return code.toUpperCase(Locale.US);
+    }
+
+    private String getAudioTrackDetails(Format format) {
+        if (format.channelCount > 0) {
+            if (format.channelCount == 1) {
+                return "Mono";
+            }
+            if (format.channelCount == 2) {
+                return "Stereo";
+            }
+            return format.channelCount + "ch";
+        }
+
+        String mime = safeTrim(format.sampleMimeType);
+        if (mime == null) {
+            return null;
+        }
+
+        int slash = mime.indexOf('/');
+        return slash >= 0 && slash + 1 < mime.length()
+                ? mime.substring(slash + 1).toUpperCase(Locale.US)
+                : mime.toUpperCase(Locale.US);
+    }
+
+    @Nullable
+    private String safeTrim(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean isPreferredMizoAudio(Format format) {
+        String language = safeTrim(format.language);
+        if (language != null) {
+            String lowerLanguage = language.toLowerCase(Locale.US);
+            if ("lus".equals(lowerLanguage) || "miz".equals(lowerLanguage)) {
+                return true;
+            }
+        }
+
+        String label = safeTrim(format.label);
+        if (label == null) {
+            return false;
+        }
+
+        String lowerLabel = label.toLowerCase(Locale.US);
+        return lowerLabel.contains("mizo")
+                || lowerLabel.contains("lus")
+                || lowerLabel.contains("miz");
+    }
+
+    private void applyPreferredAudioTrackIfNeeded() {
+        if (preferredAudioApplied || audioSelectionTouched || player == null || trackSelector == null) {
+            return;
+        }
+
+        List<AudioOption> options = getAvailableAudioOptions();
+        if (options.isEmpty()) {
+            return;
+        }
+
+        preferredAudioApplied = true;
+        for (AudioOption option : options) {
+            if (option.preferredMizo && !option.selected) {
+                setAudioTrackOverride(option, false);
+                return;
+            }
+        }
+    }
+
+    private void setFixedAudioTrack(AudioOption option) {
+        audioSelectionTouched = true;
+        preferredAudioApplied = true;
+        setAudioTrackOverride(option, true);
+    }
+
+    private void setAudioTrackOverride(AudioOption option, boolean showButton) {
+        if (trackSelector == null) {
+            return;
+        }
+
+        trackSelector.setParameters(
+                trackSelector.buildUponParameters()
+                        .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+                        .setOverrideForType(
+                                new TrackSelectionOverride(
+                                        option.group.getMediaTrackGroup(),
+                                        option.trackIndex
+                                )
+                        )
+        );
+
+        if (showButton) {
+            updateAudioTrackButtonVisibility();
+        }
+    }
+
     private void showSpeedDialog() {
         if (player == null) {
             Toast.makeText(this, "Player is not ready", Toast.LENGTH_SHORT).show();
@@ -1344,6 +1569,22 @@ public class PlayerActivity extends ComponentActivity {
         }
     }
 
+    private static class AudioOption {
+        final String label;
+        final Tracks.Group group;
+        final int trackIndex;
+        final boolean selected;
+        final boolean preferredMizo;
+
+        AudioOption(String label, Tracks.Group group, int trackIndex, boolean selected, boolean preferredMizo) {
+            this.label = label;
+            this.group = group;
+            this.trackIndex = trackIndex;
+            this.selected = selected;
+            this.preferredMizo = preferredMizo;
+        }
+    }
+
     private static class DialogOption {
         final String label;
         final boolean enabled;
@@ -1423,6 +1664,14 @@ public class PlayerActivity extends ComponentActivity {
                         String message = (errorObj != null && errorObj.has("message"))
                                 ? errorObj.get("message").getAsString()
                                 : "Something went wrong";
+                        String code = (errorObj != null && errorObj.has("code"))
+                                ? errorObj.get("code").getAsString()
+                                : "";
+
+                        if (isDeviceRevokedError(code, title, message)) {
+                            forceLogoutForDeviceRevoked(message);
+                            return;
+                        }
 
                         AppDialog.show(
                                 PlayerActivity.this,
@@ -1470,6 +1719,15 @@ public class PlayerActivity extends ComponentActivity {
                     String message = (res != null && res.has("message"))
                             ? res.get("message").getAsString()
                             : "Unknown error";
+                    String code = (res != null && res.has("code"))
+                            ? res.get("code").getAsString()
+                            : "";
+
+                    if (isDeviceRevokedError(code, "Error", message)) {
+                        forceLogoutForDeviceRevoked(message);
+                        return;
+                    }
+
                     AppDialog.show(
                             PlayerActivity.this,
                             R.drawable.error,
@@ -1575,10 +1833,10 @@ public class PlayerActivity extends ComponentActivity {
         });
     }
 
-    private void loadAlsoLikeData(String accessToken, String userId, String str) {
+    private void loadAlsoLikeData(String accessToken, String userId, String contentId, String str) {
         boolean isAgeRestrict = SessionManager.getAgeRestriction(PlayerActivity.this);
 
-        Call<List<Movie>> call = Api.getApi().getAlsoLike(AuthHeader.bearer(accessToken), userId, str,isAgeRestrict);
+        Call<List<Movie>> call = Api.getApi().getAlsoLike(AuthHeader.bearer(accessToken), contentId, userId, str,isAgeRestrict);
         Objects.requireNonNull(call).enqueue(new Callback<List<Movie>>() {
             @SuppressLint("NotifyDataSetChanged")
             @Override
@@ -1674,7 +1932,7 @@ public class PlayerActivity extends ComponentActivity {
                 } else if (movie != null){
                     isEpisode = false;
 
-                    loadAlsoLikeData(accessToken, userId, Objects.requireNonNull(movie).title);
+                    loadAlsoLikeData(accessToken, userId, Objects.requireNonNull(movie).id, movie.title);
                 }
 
                 currentEpisodeIndex = findCurrentEpisodeIndex();
@@ -1683,7 +1941,16 @@ public class PlayerActivity extends ComponentActivity {
 
             @Override
             public void onError(String title, String message) {
+                onError("", title, message);
+            }
+
+            @Override
+            public void onError(String code, String title, String message) {
                 loader.setVisibility(GONE);
+                if (isDeviceRevokedError(code, title, message)) {
+                    forceLogoutForDeviceRevoked(message);
+                    return;
+                }
                 showStartStreamErrorDialog(title, message, episode, movie, type);
             }
 
@@ -1717,6 +1984,19 @@ public class PlayerActivity extends ComponentActivity {
         boolean isSubscription = lowerTitle.contains("subscription") || lowerMessage.contains("subscri");
 
         if (isPpv || isSubscription) {
+            if (!SessionManager.getIsDeviceOwner(this)) {
+                show(
+                        PlayerActivity.this,
+                        R.drawable.warning,
+                        "Access Restricted",
+                        "Only the account owner can stream PPV content, rent, or subscribe.",
+                        true,
+                        false,
+                        null,
+                        this::resumePreviousStream
+                );
+                return;
+            }
             show(
                     PlayerActivity.this,
                     R.drawable.warning,
@@ -1741,6 +2021,31 @@ public class PlayerActivity extends ComponentActivity {
         }
     }
 
+    private boolean isDeviceRevokedError(String code, String title, String message) {
+        String normalizedCode = code == null ? "" : code.trim().toUpperCase();
+        String normalizedTitle = title == null ? "" : title.trim().toLowerCase();
+        String normalizedMessage = message == null ? "" : message.trim().toLowerCase();
+
+        return "DEVICE_REVOKED".equals(normalizedCode)
+                || normalizedTitle.contains("device access changed")
+                || normalizedMessage.contains("device was removed")
+                || normalizedMessage.contains("no longer linked")
+                || normalizedMessage.contains("sign in again on this device");
+    }
+
+    private void forceLogoutForDeviceRevoked(String message) {
+        stopPing();
+        if (player != null) {
+            player.release();
+        }
+        SessionManager.logoutWithReason(
+                this,
+                message != null && !message.trim().isEmpty()
+                        ? message
+                        : "Your device was removed from this plan after renewal. Please sign in again to continue."
+        );
+    }
+
     private void resumePreviousStream() {
         loader.setVisibility(GONE);
 
@@ -1759,6 +2064,19 @@ public class PlayerActivity extends ComponentActivity {
             @Nullable Movie requestedMovie,
             String requestedType
     ) {
+        if (!SessionManager.getIsDeviceOwner(this)) {
+            show(
+                    PlayerActivity.this,
+                    R.drawable.warning,
+                    "Access Restricted",
+                    "Only the account owner can subscribe or rent content.",
+                    true,
+                    false,
+                    null,
+                    this::resumePreviousStream
+            );
+            return;
+        }
         pendingQrIsPpv = isPpv;
         pendingQrEpisode = requestedEpisode;
         pendingQrMovie = requestedMovie;
@@ -1792,7 +2110,11 @@ public class PlayerActivity extends ComponentActivity {
 
         showQrPaymentLoadingDialog();
 
-        Api.getApi().createQr(request).enqueue(new Callback<QrLoginResponse>() {
+        Api.getApi().createPaymentQr(
+                AuthHeader.bearer(SessionManager.getAccessToken(this)),
+                SessionManager.getUserDeviceId(this),
+                request
+        ).enqueue(new Callback<QrLoginResponse>() {
             @Override
             public void onResponse(@NonNull Call<QrLoginResponse> call, @NonNull Response<QrLoginResponse> response) {
                 if (response.isSuccessful() && response.body() != null) {
@@ -1863,6 +2185,9 @@ public class PlayerActivity extends ComponentActivity {
         showQr.setVisibility(VISIBLE);
         showQr.setText("Generating...");
         showQr.setEnabled(false);
+        showQr.setFocusable(false);
+        showQr.setFocusableInTouchMode(false);
+        showQr.setClickable(false);
         showQr.setOnClickListener(null);
         qrStatus.setText("");
     }
@@ -1907,6 +2232,9 @@ public class PlayerActivity extends ComponentActivity {
         qrStatus.setText(statusText);
         showQr.setVisibility(VISIBLE);
         showQr.setEnabled(true);
+        showQr.setFocusable(true);
+        showQr.setFocusableInTouchMode(true);
+        showQr.setClickable(true);
         showQr.setText("Recreate QR");
         showQr.setOnClickListener(v -> generateQrPayment(
                 pendingQrIsPpv,
@@ -1978,7 +2306,7 @@ public class PlayerActivity extends ComponentActivity {
         qrPaymentListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                String status = snapshot.child("status").getValue(String.class);
+                String status = firebaseString(snapshot.child("status"));
                 if (status == null) {
                     return;
                 }
@@ -2047,6 +2375,13 @@ public class PlayerActivity extends ComponentActivity {
 
         qrPaymentRef = null;
         qrPaymentListener = null;
+    }
+
+    private static String firebaseString(DataSnapshot snapshot) {
+        Object value = snapshot.getValue();
+        if (value instanceof String) return (String) value;
+        if (value instanceof Number || value instanceof Boolean) return String.valueOf(value);
+        return null;
     }
 
     @Override

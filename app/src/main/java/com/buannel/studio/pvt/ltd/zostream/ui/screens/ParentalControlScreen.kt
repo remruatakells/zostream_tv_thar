@@ -3,8 +3,6 @@ package com.buannel.studio.pvt.ltd.zostream.ui.screens
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,12 +15,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -38,6 +39,12 @@ fun ParentalControlScreen(
     onAdultSelected: () -> Unit,
     onKidsSelected: () -> Unit
 ) {
+    val adultFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        adultFocusRequester.requestFocus()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -71,6 +78,7 @@ fun ParentalControlScreen(
                     badge = "Full Catalog",
                     description = "Show the complete movie and series catalog for this account.",
                     actionText = "Continue as Adult",
+                    modifier = Modifier.focusRequester(adultFocusRequester),
                     onClick = onAdultSelected
                 )
                 ViewingModeCard(
@@ -92,6 +100,7 @@ private fun ViewingModeCard(
     badge: String,
     description: String,
     actionText: String,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -104,7 +113,7 @@ private fun ViewingModeCard(
     val backgroundColor = if (focused) Color(0xFF1D4ED8) else Color(0xFF111827)
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .width(330.dp)
             .height(230.dp)
             .graphicsLayer {
@@ -114,8 +123,7 @@ private fun ViewingModeCard(
             .background(backgroundColor, shape)
             .border(2.dp, borderColor, shape)
             .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .clickable { onClick() }
+            .tvDpadClick { onClick() }
             .padding(24.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {

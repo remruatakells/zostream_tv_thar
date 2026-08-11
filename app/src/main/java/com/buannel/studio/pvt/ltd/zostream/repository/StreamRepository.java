@@ -20,7 +20,12 @@ public class StreamRepository {
 
     public interface StreamCallback {
         void onSuccess(StreamResult result);
-        void onError(String title, String message);
+        default void onError(String title, String message) {
+            onError("", title, message);
+        }
+        default void onError(String code, String title, String message) {
+            onError(title, message);
+        }
         void onFailure(Throwable throwable);
     }
 
@@ -91,15 +96,11 @@ public class StreamRepository {
                             }
 
                         } else {
-                            String title = (res != null && res.has("title") && !res.get("title").isJsonNull())
-                                    ? res.get("title").getAsString()
-                                    : "Error";
+                            String code = getErrorString(res, "code", "");
+                            String title = getErrorString(res, "title", "Error");
+                            String message = getErrorString(res, "message", "Unknown error");
 
-                            String message = (res != null && res.has("message") && !res.get("message").isJsonNull())
-                                    ? res.get("message").getAsString()
-                                    : "Unknown error";
-
-                            callback.onError(title, message);
+                            callback.onError(code, title, message);
                         }
                     }
 
@@ -122,19 +123,34 @@ public class StreamRepository {
 
             JsonObject errorObj = new Gson().fromJson(errorJson, JsonObject.class);
 
-            String title = (errorObj != null && errorObj.has("title") && !errorObj.get("title").isJsonNull())
-                    ? errorObj.get("title").getAsString()
-                    : "Error";
+            String code = getErrorString(errorObj, "code", "");
+            String title = getErrorString(errorObj, "title", "Error");
+            String message = getErrorString(errorObj, "message", "Something went wrong");
 
-            String message = (errorObj != null && errorObj.has("message") && !errorObj.get("message").isJsonNull())
-                    ? errorObj.get("message").getAsString()
-                    : "Something went wrong";
-
-            callback.onError(title, message);
+            callback.onError(code, title, message);
 
         } catch (Exception e) {
             Log.e("StreamRepo", "Error parsing HTTP error", e);
             callback.onError("Error", "Unable to parse error response");
         }
+    }
+
+    private static String getErrorString(JsonObject errorObj, String key, String fallback) {
+        if (errorObj == null) {
+            return fallback;
+        }
+
+        if (errorObj.has(key) && !errorObj.get(key).isJsonNull()) {
+            return errorObj.get(key).getAsString();
+        }
+
+        if (errorObj.has("error") && errorObj.get("error").isJsonObject()) {
+            JsonObject nestedError = errorObj.getAsJsonObject("error");
+            if (nestedError.has(key) && !nestedError.get(key).isJsonNull()) {
+                return nestedError.get(key).getAsString();
+            }
+        }
+
+        return fallback;
     }
 }

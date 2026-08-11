@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,36 @@ import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 
+private const val DETAILS_PAYMENT_REFRESH_KEY = "details_payment_refresh"
+
+private fun getErrorString(errorObj: JsonObject?, key: String, fallback: String): String {
+    if (errorObj == null) return fallback
+
+    if (errorObj.has(key) && !errorObj.get(key).isJsonNull) {
+        return errorObj.get(key).asString
+    }
+
+    if (errorObj.has("error") && errorObj.get("error").isJsonObject) {
+        val nestedError = errorObj.getAsJsonObject("error")
+        if (nestedError.has(key) && !nestedError.get(key).isJsonNull) {
+            return nestedError.get(key).asString
+        }
+    }
+
+    return fallback
+}
+
+private fun isDeviceRevokedError(code: String?, title: String?, message: String?): Boolean {
+    val normalizedCode = code.orEmpty().trim().uppercase()
+    val normalizedTitle = title.orEmpty().trim().lowercase()
+    val normalizedMessage = message.orEmpty().trim().lowercase()
+
+    return normalizedCode == "DEVICE_REVOKED" ||
+            normalizedTitle.contains("device access changed") ||
+            normalizedMessage.contains("device was removed") ||
+            normalizedMessage.contains("no longer linked") ||
+            normalizedMessage.contains("sign in again on this device")
+}
 
 @OptIn(UnstableApi::class, ExperimentalTvMaterial3Api::class)
 @Composable
@@ -129,6 +160,9 @@ fun App(
                 contentType = contentType,
                 subscriptionId = subscriptionId,
                 onSuccess = {
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set(DETAILS_PAYMENT_REFRESH_KEY, System.currentTimeMillis())
                     navController.popBackStack()
                 }
             )
@@ -144,9 +178,13 @@ fun App(
         ) { backStackEntry ->
 
             val movieId = backStackEntry.arguments?.getString("id") ?: ""
+            val paymentRefreshKey by backStackEntry.savedStateHandle
+                .getStateFlow(DETAILS_PAYMENT_REFRESH_KEY, 0L)
+                .collectAsState()
 
             DetailsScreen(
                 movieId = movieId,
+                refreshKey = paymentRefreshKey,
                 accessToken = SessionManager.getAccessToken(context),
                 userId = SessionManager.getUserId(context),
                 deviceId = SessionManager.getUserDeviceId(context),
@@ -200,8 +238,21 @@ fun App(
                                 val gson = Gson()
                                 val errorObj = gson.fromJson(errorJson, JsonObject::class.java)
 
-                                val title = errorObj?.get("title")?.asString ?: "Error"
-                                val message = errorObj?.get("message")?.asString ?: "Something went wrong"
+                                val code = getErrorString(errorObj, "code", "")
+                                val title = getErrorString(errorObj, "title", "Error")
+                                val message = getErrorString(errorObj, "message", "Something went wrong")
+
+                                if (isDeviceRevokedError(code, title, message)) {
+                                    (context as? Activity)?.let { activity ->
+                                        SessionManager.logoutWithReason(
+                                            activity,
+                                            message.ifBlank {
+                                                "Your device was removed from this plan after renewal. Please sign in again to continue."
+                                            }
+                                        )
+                                    }
+                                    return
+                                }
 
                                 if (message.contains("rent")) {
 
@@ -225,7 +276,7 @@ fun App(
                                                 "/qr-payment?isPpv=$isPpv" +
                                                         "&movieId=$contentId" +
                                                         "&amount=$amountValue"+
-                                                        "&type=$type" +                  // 👈 ADD
+                                                        "&contentType=$type" +
                                                         "&subscriptionId=${subscription?.id}"
                                             )
                                         },
