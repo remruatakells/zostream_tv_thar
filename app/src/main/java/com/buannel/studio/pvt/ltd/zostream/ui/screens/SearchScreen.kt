@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -36,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Glow
@@ -205,59 +207,73 @@ private fun SearchKeyboardDialog(
         listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0")
     )
 
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
             modifier = Modifier
-                .width(850.dp)
-                .background(Color(0xFF0F172A), RoundedCornerShape(18.dp))
-                .border(1.dp, Color(0xFF475569), RoundedCornerShape(18.dp))
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxSize()
+                .padding(horizontal = 32.dp, vertical = 24.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = query.ifBlank { "Search movies and series" },
-                color = if (query.isBlank()) Color(0xFF94A3B8) else Color.White,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
+            Column(
                 modifier = Modifier
+                    .widthIn(max = 850.dp)
                     .fillMaxWidth()
-                    .padding(bottom = 14.dp)
-            )
+                    .background(Color(0xFF0F172A), RoundedCornerShape(18.dp))
+                    .border(1.dp, Color(0xFF475569), RoundedCornerShape(18.dp))
+                    .padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = query.ifBlank { "Search movies and series" },
+                    color = if (query.isBlank()) Color(0xFF94A3B8) else Color.White,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 14.dp)
+                )
 
-            characterRows.forEachIndexed { rowIndex, keys ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally)
-                ) {
-                    keys.forEachIndexed { columnIndex, label ->
-                        SearchKeyboardKey(
-                            label = label,
-                            onClick = { onCharacter(label.lowercase()) },
-                            modifier = Modifier
-                                .width(70.dp)
-                                .height(52.dp)
-                                .padding(vertical = 4.dp)
-                                .then(
-                                    if (rowIndex == 0 && columnIndex == 0) {
-                                        Modifier.focusRequester(firstKeyFocusRequester)
-                                    } else {
-                                        Modifier
-                                    }
-                                )
+                characterRows.forEachIndexed { rowIndex, keys ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(
+                            7.dp,
+                            Alignment.CenterHorizontally
                         )
+                    ) {
+                        keys.forEachIndexed { columnIndex, label ->
+                            SearchKeyboardKey(
+                                label = label,
+                                onClick = { onCharacter(label.lowercase()) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp)
+                                    .padding(vertical = 4.dp)
+                                    .then(
+                                        if (rowIndex == 0 && columnIndex == 0) {
+                                            Modifier.focusRequester(firstKeyFocusRequester)
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
+                            )
+                        }
                     }
                 }
-            }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                SearchKeyboardKey("Space", onSpace, Modifier.weight(2f).height(52.dp))
-                SearchKeyboardKey("Delete", onDelete, Modifier.weight(1f).height(52.dp))
-                SearchKeyboardKey("Clear", onClear, Modifier.weight(1f).height(52.dp))
-                SearchKeyboardKey("Done", onDone, Modifier.weight(1f).height(52.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    SearchKeyboardKey("Space", onSpace, Modifier.weight(2f).height(52.dp))
+                    SearchKeyboardKey("Delete", onDelete, Modifier.weight(1f).height(52.dp))
+                    SearchKeyboardKey("Clear", onClear, Modifier.weight(1f).height(52.dp))
+                    SearchKeyboardKey("Done", onDone, Modifier.weight(1f).height(52.dp))
+                }
             }
         }
 
