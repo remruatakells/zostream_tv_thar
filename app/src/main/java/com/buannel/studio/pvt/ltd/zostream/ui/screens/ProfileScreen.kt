@@ -1,6 +1,7 @@
 package com.buannel.studio.pvt.ltd.zostream.ui.screens
 
 import android.app.Activity
+import android.widget.ImageView
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -35,20 +38,87 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.buannel.studio.pvt.ltd.zostream.api.Api
 import com.buannel.studio.pvt.ltd.zostream.model.User
 import com.buannel.studio.pvt.ltd.zostream.response.UserResponse
 import com.buannel.studio.pvt.ltd.zostream.utils.AuthHeader
 import com.buannel.studio.pvt.ltd.zostream.utils.SessionManager
+import com.buannel.studio.pvt.ltd.zostream.utils.QRUtils
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
+
+private data class SupportCategory(val name: String, val issues: List<String>)
+
+private val supportCategories = listOf(
+    SupportCategory("Video & Playback", listOf(
+        "Video Won't Play", "Loading / Buffering", "Playback Stops or Freezes",
+        "App Crashes During Playback", "No Audio", "Audio and Video Out of Sync",
+        "Poor Video Quality", "Quality Selection Problem",
+        "Seek / Fast-forward Problem", "Continue Watching / Resume Problem",
+        "Fullscreen Problem", "Picture-in-Picture Problem",
+        "Live Channel Problem", "Other Playback Problem"
+    )),
+    SupportCategory("Login & OTP", listOf(
+        "OTP Not Received", "WhatsApp OTP Not Received", "OTP Invalid or Expired",
+        "Login Failed", "Phone Number Not Recognized",
+        "Unable to Access Existing Account",
+        "Session Expired / Logged Out Automatically", "QR Login Problem",
+        "Other Login Problem"
+    )),
+    SupportCategory("Subscription & Payment", listOf(
+        "Payment Successful but Subscription Inactive",
+        "Amount Deducted but Plan Not Activated", "Payment Failed",
+        "Payment Stuck on Pending", "Subscription Expiry Date Incorrect",
+        "Renewal Problem", "Plan Upgrade / Change Problem", "Wrong Plan Activated",
+        "Duplicate Payment", "Payment History / Receipt Problem", "Refund Problem",
+        "Other Subscription Problem"
+    )),
+    SupportCategory("Movie & Episode", listOf(
+        "Movie Won't Play", "Movie or Episode Missing", "Wrong Movie / Episode",
+        "Episode Order Incorrect", "Subtitle Missing",
+        "Subtitle Incorrect or Out of Sync", "Audio Language / Track Problem",
+        "Poster or Thumbnail Incorrect",
+        "Title / Description / Release Date Incorrect",
+        "Search Cannot Find Content", "Other Content Problem"
+    )),
+    SupportCategory("Device & TV", listOf(
+        "Device Limit Reached", "Remove or Change Device", "Device Not Recognized",
+        "Owner Device Detected Incorrectly", "Owner-only Action Blocked",
+        "Android TV Login Problem", "Android TV Playback Problem",
+        "TV Remote / D-pad Problem", "QR Code Scanning Problem",
+        "Screen Casting Problem", "App Not Compatible with Device",
+        "Other Device Problem"
+    )),
+    SupportCategory("PPV & Rental", listOf(
+        "Paid but Content Still Locked", "Rented Content Won't Play",
+        "Rental Expiry Date Incorrect", "Rental Expired Too Early",
+        "Wrong Content Unlocked", "PPV Payment Failed or Pending",
+        "Duplicate PPV Payment", "PPV Refund Problem", "Other Rental Problem"
+    )),
+    SupportCategory("Account & Profile", listOf(
+        "Change Phone Number", "Update Profile Information", "Account Inactive",
+        "Delete Account", "Unauthorized Login", "Unknown Device on Account",
+        "Account Security Concern", "Notification Problem",
+        "Privacy or Personal Data Request", "Other Account Problem"
+    )),
+    SupportCategory("Other & Feedback", listOf(
+        "Request a Movie or Series", "Feature Request",
+        "App Design / Usability Feedback", "Accessibility Problem",
+        "Bug Not Listed Above", "General Complaint", "Suggestion", "Compliment",
+        "Other"
+    ))
+)
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -66,6 +136,7 @@ fun ProfileScreen() {
     }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showSupport by remember { mutableStateOf(false) }
 
     LaunchedEffect(userId, accessToken) {
         isLoading = true
@@ -137,9 +208,17 @@ fun ProfileScreen() {
                 },
                 onLogout = {
                     (context as? Activity)?.let { SessionManager.logout(it) }
-                }
+                },
+                onSupport = { showSupport = true }
             )
         }
+    }
+
+    if (showSupport) {
+        SupportDialog(
+            userId = userId,
+            onDismiss = { showSupport = false }
+        )
     }
 }
 
@@ -151,7 +230,8 @@ private fun ProfileContent(
     ageRestrictionEnabled: Boolean,
     onParentalModeChange: (String) -> Unit,
     onAgeRestrictionChange: (Boolean) -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onSupport: () -> Unit
 ) {
     val logoutFocusRequester = remember { FocusRequester() }
 
@@ -238,8 +318,205 @@ private fun ProfileContent(
                     enabled = ageRestrictionEnabled,
                     onClick = { onAgeRestrictionChange(!ageRestrictionEnabled) }
                 )
+
+                SettingsItem(
+                    title = "Help / Support",
+                    value = "Open",
+                    enabled = false,
+                    onClick = onSupport
+                )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun SupportDialog(
+    userId: String,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val appVersion = remember(context) {
+        try {
+            context.packageManager
+                .getPackageInfo(context.packageName, 0)
+                .versionName ?: "unknown"
+        } catch (_: Exception) {
+            "unknown"
+        }
+    }
+    var categoryIndex by remember { mutableStateOf<Int?>(null) }
+    var selectedIssue by remember { mutableStateOf<String?>(null) }
+    val category = categoryIndex?.let(supportCategories::get)
+    val firstChoiceFocus = remember { FocusRequester() }
+
+    LaunchedEffect(categoryIndex, selectedIssue) {
+        if (selectedIssue == null) {
+            firstChoiceFocus.requestFocus()
+        }
+    }
+
+    val goBack = {
+        when {
+            selectedIssue != null -> selectedIssue = null
+            categoryIndex != null -> categoryIndex = null
+            else -> onDismiss()
+        }
+    }
+
+    Dialog(onDismissRequest = goBack) {
+        Row(
+            modifier = Modifier
+                .width(if (selectedIssue == null) 680.dp else 920.dp)
+                .background(Color(0xFF111827), RoundedCornerShape(14.dp))
+                .border(2.dp, Color(0xFF334155), RoundedCornerShape(14.dp))
+                .padding(28.dp),
+            horizontalArrangement = Arrangement.spacedBy(28.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.width(540.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = when {
+                        selectedIssue != null -> "Scan to chat"
+                        category != null -> category.name
+                        else -> "Choose a support category"
+                    },
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = when {
+                        selectedIssue != null ->
+                            "Scan the QR code with your phone to open a prefilled WhatsApp message."
+                        category != null ->
+                            "Choose the issue that best matches your problem."
+                        else ->
+                            "Choose what you need help with before opening WhatsApp."
+                    },
+                    color = Color(0xFFCBD5E1),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+
+                if (selectedIssue == null) {
+                    val choices: List<String> =
+                        category?.issues ?: supportCategories.map { it.name }
+                    LazyColumn(
+                        modifier = Modifier
+                            .width(620.dp)
+                            .height(360.dp),
+                        verticalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        itemsIndexed(choices) { index, label ->
+                            SupportChoice(
+                                label = label,
+                                modifier = if (index == 0) {
+                                    Modifier.focusRequester(firstChoiceFocus)
+                                } else {
+                                    Modifier
+                                },
+                                onClick = {
+                                    if (category == null) {
+                                        categoryIndex = index
+                                    } else {
+                                        selectedIssue = label
+                                    }
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Category: ${category?.name.orEmpty()}",
+                        color = Color(0xFF93C5FD),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Issue: $selectedIssue",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SupportChoice(label = "Back", onClick = goBack)
+                    SupportChoice(label = "Close", onClick = onDismiss)
+                }
+            }
+
+            if (selectedIssue != null && category != null) {
+                val message =
+                    "Hello Zo Stream Support,\n\n" +
+                            "I need help with the following issue:\n" +
+                            "• Category: *${category.name}*\n" +
+                            "• Issue: *$selectedIssue*\n\n" +
+                            "Platform Details:\n" +
+                            "• Platform: *Android TV*\n" +
+                            "• Device Type: *tv*\n" +
+                            "• App Version: *$appVersion*\n\n" +
+                            "User Details:\n" +
+                            "• User ID: *${userId.ifBlank { "Guest" }}*\n\n" +
+                            "Additional details:\n"
+                val whatsappUrl =
+                    "https://wa.me/918837076347?text=" +
+                            URLEncoder.encode(message, StandardCharsets.UTF_8.toString())
+
+                AndroidView(
+                    modifier = Modifier
+                        .size(320.dp)
+                        .background(Color.White, RoundedCornerShape(12.dp))
+                        .padding(8.dp),
+                    factory = { context ->
+                        ImageView(context).also {
+                            it.scaleType = ImageView.ScaleType.FIT_CENTER
+                        }
+                    },
+                    update = { QRUtils.generateQR(it, whatsappUrl) }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun SupportChoice(
+    label: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(8.dp)
+
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .background(
+                if (focused) Color(0xFF2563EB) else Color(0xFF1E293B),
+                shape
+            )
+            .border(
+                2.dp,
+                if (focused) Color(0xFFBAE6FD) else Color(0xFF475569),
+                shape
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .tvDpadClick(onClick = onClick)
+            .padding(horizontal = 18.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

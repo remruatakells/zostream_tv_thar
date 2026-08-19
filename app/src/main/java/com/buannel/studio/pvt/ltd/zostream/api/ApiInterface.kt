@@ -59,14 +59,6 @@ interface ApiInterface {
         @Body body: JsonObject
     ): Call<JsonObject>
 
-    // ➕ Ping Stream
-    @POST("api/v4/playback/sessions/heartbeat")
-    fun pingStream(
-        @Header("Authorization") bearerToken: String,
-        @Header("Device-Token") deviceToken: String,
-        @Body body: JsonObject
-    ): Call<JsonObject>
-
     @POST("api/v4/playback/sessions/stop")
     fun stopStream(
         @Header("Authorization") bearerToken: String,

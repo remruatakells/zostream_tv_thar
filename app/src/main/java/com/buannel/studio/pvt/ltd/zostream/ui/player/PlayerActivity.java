@@ -66,7 +66,6 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
@@ -98,17 +97,8 @@ public class PlayerActivity extends ComponentActivity {
     private String title;
     private ImageView pauPlayBtn;
 
-    private final Handler pingHandler = new Handler();
-    private Runnable pingRunnable;
-
-    private static final int PING_INTERVAL = 20000; // 20 sec
     private static final long SEEK_INCREMENT_MS = 10000; // 10 sec
     private static final long PLAYLIST_ANIMATION_DURATION_MS = 180L;
-    private boolean isPingRunning = false;
-    private int retryCount = 0;
-
-    private static final int MAX_RETRY = 3;
-    private static final int RETRY_DELAY = 5000; // 5 sec
 
     private String streamToken;
     private int subscriptionId;
@@ -453,7 +443,6 @@ public class PlayerActivity extends ComponentActivity {
     }
 
     private void playEpisode(@NonNull Episode episode) {
-        stopPing();
         startStream(episode, null, "episode");
     }
 
@@ -1011,7 +1000,6 @@ public class PlayerActivity extends ComponentActivity {
         player.setPlayWhenReady(true);
         player.prepare();
         player.play();
-        startPing();
     }
 
     private long parseWatchPosition(@Nullable String value) {
@@ -1599,210 +1587,6 @@ public class PlayerActivity extends ComponentActivity {
         }
     }
 
-    private void stopPing() {
-        isPingRunning = false;
-
-        if (pingHandler != null && pingRunnable != null) {
-            pingHandler.removeCallbacks(pingRunnable);
-        }
-    }
-
-    private void startPing() {
-
-        if (isPingRunning) return; // prevent duplicate
-
-        isPingRunning = true;
-
-        pingRunnable = new Runnable() {
-            @Override
-            public void run() {
-
-                if (!isPingRunning) return;
-                sendPing(); // normal ping
-
-                pingHandler.postDelayed(this, PING_INTERVAL);
-            }
-        };
-
-        pingHandler.post(pingRunnable);
-    }
-
-    private void sendPing() {
-
-        String accessToken = SessionManager.getAccessToken(this);
-        String deviceToken = SessionManager.getUserDeviceId(this);
-
-        JsonObject body = new JsonObject();
-        body.addProperty("stream_token", streamToken);
-        body.addProperty("subscription_id", subscriptionId);
-        body.addProperty("movie_id", movieId);
-        body.addProperty("type", type);
-
-        Api.getApi().pingStream(
-                AuthHeader.bearer(accessToken),
-                deviceToken,
-                body
-        ).enqueue(new Callback<JsonObject>() {
-
-            @Override
-            public void onResponse(@NonNull Call<JsonObject> call, @NonNull Response<JsonObject> response) {
-                // ❌ Handle HTTP error (like 400, 500)
-                if (!response.isSuccessful()) {
-                    player.release();
-                    try {
-                        String errorJson = response.errorBody() != null
-                                ? response.errorBody().string()
-                                : null;
-
-                        Gson gson = new Gson();
-                        JsonObject errorObj = gson.fromJson(errorJson, JsonObject.class);
-
-                        String title = (errorObj != null && errorObj.has("title"))
-                                ? errorObj.get("title").getAsString()
-                                : "Error";
-
-                        String message = (errorObj != null && errorObj.has("message"))
-                                ? errorObj.get("message").getAsString()
-                                : "Something went wrong";
-                        String code = (errorObj != null && errorObj.has("code"))
-                                ? errorObj.get("code").getAsString()
-                                : "";
-
-                        if (isDeviceRevokedError(code, title, message)) {
-                            forceLogoutForDeviceRevoked(message);
-                            return;
-                        }
-
-                        AppDialog.show(
-                                PlayerActivity.this,
-                                R.drawable.error,
-                                title,
-                                message,
-                                false,
-                                true,
-                                () -> {
-                                    finish(); // 🔥 close PlayerActivity
-                                },
-                                null
-                        );
-
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        player.release();
-                        AppDialog.show(
-                                PlayerActivity.this,
-                                R.drawable.error,
-                                "Error",
-                                "Unable to parse error response",
-                                false,
-                                true,
-                                () -> {
-                                    finish(); // 🔥 close PlayerActivity
-                                },
-                                null);
-                    }
-
-                    return;
-                }
-
-                // ✅ Success response
-                JsonObject res = response.body();
-
-                if (res != null && res.has("status")
-                        && "success".equals(res.get("status").getAsString())) {
-
-                    Log.e("PING", "Ping Started - " + getCurrentTrackInfo());
-                    retryCount = 0; // ✅ reset retry
-
-                } else {
-                    player.release();
-                    String message = (res != null && res.has("message"))
-                            ? res.get("message").getAsString()
-                            : "Unknown error";
-                    String code = (res != null && res.has("code"))
-                            ? res.get("code").getAsString()
-                            : "";
-
-                    if (isDeviceRevokedError(code, "Error", message)) {
-                        forceLogoutForDeviceRevoked(message);
-                        return;
-                    }
-
-                    AppDialog.show(
-                            PlayerActivity.this,
-                            R.drawable.error,
-                            "Error",
-                            message,
-                            false,
-                            true,
-                            () -> {
-                                finish(); // 🔥 close PlayerActivity
-                            },
-                            null);
-
-                    System.out.println("❌ API ERROR: " + message);
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<JsonObject> call, @NonNull Throwable t) {
-                Log.e("PING", "ERROR "+t.getMessage());
-
-                if (t.getMessage() != null &&
-                        t.getMessage().contains("Too many follow-up requests")) {
-
-                    AppDialog.show(
-                            PlayerActivity.this,
-                            R.drawable.error,
-                            "Server Error",
-                            "Redirect loop detected. Please contact support.",
-                            false,
-                            true,
-                            () -> finish(),
-                            null
-                    );
-                    return;
-                }
-
-                handleRetry();
-            }
-
-            private void handleRetry() {
-
-                if (!isPingRunning) return;
-
-                if (retryCount < MAX_RETRY) {
-                    retryCount++;
-
-                    Log.e("PING", "⚠️ Ping retry " + retryCount);
-
-                    pingHandler.postDelayed(() -> {
-                        sendPing();
-                    }, RETRY_DELAY);
-
-                } else {
-                    Log.e("PING", "❌ Ping stopped after retries");
-                    player.release();
-                    stopPing();
-
-                    AppDialog.show(
-                            PlayerActivity.this,
-                            R.drawable.error,
-                            "Error",
-                            "Unable to stream, please restart player or app",
-                            false,
-                            true,
-                            () -> {
-                                finish(); // 🔥 close PlayerActivity
-                            },
-                            null);
-
-                    // OPTIONAL: show UI error or stop player
-                }
-            }
-        });
-    }
-
     private void stopStreamApi(long watchPosition) {
         String accessToken = SessionManager.getAccessToken(this);
         String deviceToken = SessionManager.getUserDeviceId(this);
@@ -1852,7 +1636,6 @@ public class PlayerActivity extends ComponentActivity {
                             item -> {
                                 Movie selectedMovie = (Movie) item;
 
-                                stopPing();
                                 startStream(null, selectedMovie, "movie");
                             },
                             PlayerActivity.this::hidePlaylistAndFocusControls
@@ -2034,7 +1817,6 @@ public class PlayerActivity extends ComponentActivity {
     }
 
     private void forceLogoutForDeviceRevoked(String message) {
-        stopPing();
         if (player != null) {
             player.release();
         }
@@ -2053,9 +1835,6 @@ public class PlayerActivity extends ComponentActivity {
             player.play();
         }
 
-        if (streamToken != null && !streamToken.isEmpty()) {
-            startPing();
-        }
     }
 
     private void generateQrPayment(
@@ -2389,8 +2168,6 @@ public class PlayerActivity extends ComponentActivity {
         super.onPause();
         setPlayerScreenAwake(false);
         if (player != null) player.pause();
-        Log.e("PING", "Ping Stop in background");
-        stopPing(); // ✅ stop when background
     }
 
     @Override
@@ -2401,7 +2178,6 @@ public class PlayerActivity extends ComponentActivity {
             watchPosition = player.getCurrentPosition();
         }
 
-        stopPing();
         stopStreamApi(watchPosition);
 
         if (player != null) {
@@ -2418,6 +2194,5 @@ public class PlayerActivity extends ComponentActivity {
     protected void onResume() {
         super.onResume();
         setPlayerScreenAwake(true);
-        startPing(); // ✅ restart
     }
 }

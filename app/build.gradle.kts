@@ -24,8 +24,8 @@ android {
         applicationId = "com.buannel.studio.pvt.ltd.zostream"
         minSdk = 21
         targetSdk = 36
-        versionCode = 202935
-        versionName = "2029.3.5"
+        versionCode = 202936
+        versionName = "2029.3.6"
     }
 
     buildTypes {
