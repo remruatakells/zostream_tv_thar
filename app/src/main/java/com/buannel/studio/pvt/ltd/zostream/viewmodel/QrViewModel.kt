@@ -13,6 +13,7 @@ import com.buannel.studio.pvt.ltd.zostream.utils.DeviceUtils
 import com.buannel.studio.pvt.ltd.zostream.utils.AuthHeader
 import com.buannel.studio.pvt.ltd.zostream.utils.SessionManager
 import com.google.firebase.database.*
+import com.google.gson.JsonParser
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import retrofit2.Call
@@ -29,6 +30,8 @@ class QrViewModel : ViewModel() {
 
     var stopTimer by mutableStateOf(false)
     var showRetry by mutableStateOf(false)
+    var ownerDeviceRequired by mutableStateOf(false)
+    var ownerDeviceMessage by mutableStateOf<String?>(null)
 
     fun createQr(
         context: Context,
@@ -39,6 +42,8 @@ class QrViewModel : ViewModel() {
         subscriptionId: Int? = null ) {
 
         loading = true
+        ownerDeviceRequired = false
+        ownerDeviceMessage = null
 
         val request = if (isPpv) {
 
@@ -97,7 +102,24 @@ class QrViewModel : ViewModel() {
                         startTimer()
 
                     } else {
-                        timerText = "Failed"
+                        val message = try {
+                            response.errorBody()?.string()?.let { body ->
+                                JsonParser().parse(body).asJsonObject
+                                    .get("message")?.asString
+                            }
+                        } catch (_: Exception) {
+                            null
+                        }
+
+                        if (response.code() == 403) {
+                            SessionManager.setIsDeviceOwner(context, false)
+                            ownerDeviceRequired = true
+                            ownerDeviceMessage = message
+                                ?: "Only the account owner device can make a payment."
+                        } else {
+                            timerText = message ?: "Failed"
+                            showRetry = true
+                        }
                     }
                 }
 

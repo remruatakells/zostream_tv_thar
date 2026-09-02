@@ -1,6 +1,8 @@
 package com.buannel.studio.pvt.ltd.zostream.api
 
 import com.buannel.studio.pvt.ltd.zostream.model.Movie
+import com.buannel.studio.pvt.ltd.zostream.payment.AmazonIapVerifyRequest
+import com.buannel.studio.pvt.ltd.zostream.payment.BillingPlansResponse
 import com.buannel.studio.pvt.ltd.zostream.request.OTPVerifyRequest
 import com.buannel.studio.pvt.ltd.zostream.request.OtpRequest
 import com.buannel.studio.pvt.ltd.zostream.request.QrPaymentRequest
@@ -159,5 +161,15 @@ interface ApiInterface {
     @GET("/api/v4/banners")
     fun getBanner(
     ): Call<BannerResponse>
+
+    @GET("api/v4/billing/plans/device/tv")
+    fun getTvBillingPlans(): Call<BillingPlansResponse>
+
+    @POST("api/v4/billing/payments/amazon/verify")
+    fun verifyAmazonIap(
+        @Header("Authorization") bearerToken: String,
+        @Header("Device-Token") deviceToken: String,
+        @Body request: AmazonIapVerifyRequest
+    ): Call<JsonObject>
 
 }

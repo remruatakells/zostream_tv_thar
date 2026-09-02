@@ -13,6 +13,11 @@
         android:name="android.software.leanback"
         android:required="true" />
 
+    <queries>
+        <package android:name="com.amazon.sdktestclient" />
+        <package android:name="com.amazon.venezia" />
+    </queries>
+
     <application
         android:name=".MyApp"
         android:allowBackup="true"
@@ -25,6 +30,18 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ZoStreamTv"
         tools:targetApi="24">
+        <receiver
+            android:name="com.amazon.device.iap.ResponseReceiver"
+            android:exported="true"
+            android:permission="com.amazon.inapp.purchasing.Permission.NOTIFY">
+            <intent-filter>
+                <action android:name="com.amazon.inapp.purchasing.NOTIFY" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name=".payment.AmazonIapActivity"
+            android:exported="false" />
         <activity
             android:name=".ui.player.PlayerActivity"
             android:exported="false" />

@@ -2,6 +2,8 @@ package com.buannel.studio.pvt.ltd.zostream
 
 import android.app.Application
 import com.buannel.studio.pvt.ltd.zostream.api.Api
+import com.buannel.studio.pvt.ltd.zostream.payment.AmazonIapManager
+import com.buannel.studio.pvt.ltd.zostream.payment.PaymentFeatureConfig
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
@@ -12,5 +14,7 @@ class MyApp : Application() {
 
         // API is initialized only after official verification returns api_base_url.
         Api.init(this)
+        PaymentFeatureConfig.start()
+        AmazonIapManager.initialize(this)
     }
 }

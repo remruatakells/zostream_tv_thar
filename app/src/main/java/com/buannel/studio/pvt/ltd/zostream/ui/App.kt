@@ -40,6 +40,8 @@ import androidx.navigation.navArgument
 import com.buannel.studio.pvt.ltd.zostream.R
 import com.buannel.studio.pvt.ltd.zostream.api.Api
 import com.buannel.studio.pvt.ltd.zostream.ui.components.QrPaymentScreenUI
+import com.buannel.studio.pvt.ltd.zostream.ui.components.AmazonIapPaymentScreen
+import com.buannel.studio.pvt.ltd.zostream.payment.PaymentFeatureConfig
 import com.buannel.studio.pvt.ltd.zostream.ui.player.PlayerActivity
 import com.buannel.studio.pvt.ltd.zostream.ui.screens.MainNavigation
 import com.buannel.studio.pvt.ltd.zostream.ui.screens.details.DetailsScreen
@@ -57,6 +59,25 @@ import retrofit2.Callback
 import retrofit2.Response
 
 private const val DETAILS_PAYMENT_REFRESH_KEY = "details_payment_refresh"
+
+private fun paymentRoute(
+    isPpv: Boolean,
+    movieId: String? = null,
+    amount: Any? = null,
+    contentType: String? = null,
+    subscriptionId: Int? = null
+): String {
+    val destination = if (!isPpv && PaymentFeatureConfig.isAmazonIapEnabled()) {
+        "iap-payment"
+    } else {
+        "qr-payment"
+    }
+    return "/$destination?isPpv=$isPpv" +
+        "&movieId=${movieId.orEmpty()}" +
+        "&amount=${amount ?: ""}" +
+        "&contentType=${contentType.orEmpty()}" +
+        "&subscriptionId=${subscriptionId ?: ""}"
+}
 
 private fun getErrorString(errorObj: JsonObject?, key: String, fallback: String): String {
     if (errorObj == null) return fallback
@@ -94,6 +115,24 @@ fun App(
 ) {
     val context = LocalContext.current
     var showExitDialog by remember { mutableStateOf(false) }
+
+    fun navigateToOwnerPayment(route: String) {
+        if (!SessionManager.getIsDeviceOwner(context)) {
+            AppDialog.show(
+                context,
+                R.drawable.warning,
+                "Owner Device Required",
+                "Only the account owner device can subscribe or rent content.",
+                false,
+                false,
+                null,
+                null
+            )
+            return
+        }
+
+        navController.navigate(route)
+    }
 
     BackHandler {
         if (!navController.popBackStack()) {
@@ -159,6 +198,46 @@ fun App(
                 amount = amount,
                 contentType = contentType,
                 subscriptionId = subscriptionId,
+                onSuccess = {
+                    navController.previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set(DETAILS_PAYMENT_REFRESH_KEY, System.currentTimeMillis())
+                    navController.popBackStack()
+                },
+                onOwnerDeviceRequired = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = "/iap-payment?isPpv={isPpv}&movieId={movieId}&amount={amount}&contentType={contentType}&subscriptionId={subscriptionId}",
+            arguments = listOf(
+                navArgument("isPpv") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
+                navArgument("movieId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = ""
+                },
+                navArgument("amount") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = ""
+                },
+                navArgument("contentType") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = ""
+                },
+                navArgument("subscriptionId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = ""
+                }
+            )
+        ) { backStackEntry ->
+            AmazonIapPaymentScreen(
                 onSuccess = {
                     navController.previousBackStackEntry
                         ?.savedStateHandle
@@ -272,13 +351,13 @@ fun App(
                                             val isPpv = true
                                             val amountValue = movie.ppvAmount ?: 0.0
 
-                                            navController.navigate(
-                                                "/qr-payment?isPpv=$isPpv" +
-                                                        "&movieId=$contentId" +
-                                                        "&amount=$amountValue"+
-                                                        "&contentType=$type" +
-                                                        "&subscriptionId=${subscription?.id}"
-                                            )
+                                            navigateToOwnerPayment(paymentRoute(
+                                                isPpv = isPpv,
+                                                movieId = contentId,
+                                                amount = amountValue,
+                                                contentType = type,
+                                                subscriptionId = subscription?.id
+                                            ))
                                         },
                                         null
                                     )
@@ -297,7 +376,7 @@ fun App(
                                         true,
                                         false,
                                         {
-                                            navController.navigate("/qr-payment?isPpv=false")
+                                            navigateToOwnerPayment(paymentRoute(isPpv = false))
                                         },
                                         null
                                     )
@@ -430,15 +509,15 @@ fun App(
                 onQrPayment = { movieId, isPPV, subscriptionId, type ->
 
                     if (isPPV == true) {
-                        navController.navigate(
-                            "/qr-payment?isPpv=true" +
-                                    "&movieId=${movieId}" +
-                                    "&amount=${0}" +
-                                    "&contentType=$type" +
-                                    "&subscriptionId=${subscriptionId}"
-                        )
+                        navigateToOwnerPayment(paymentRoute(
+                            isPpv = true,
+                            movieId = movieId,
+                            amount = 0,
+                            contentType = type,
+                            subscriptionId = subscriptionId
+                        ))
                     } else {
-                        navController.navigate("/qr-payment?isPpv=false")
+                        navigateToOwnerPayment(paymentRoute(isPpv = false))
                     }
                 }
             )

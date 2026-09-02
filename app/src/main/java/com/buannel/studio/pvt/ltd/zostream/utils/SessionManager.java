@@ -100,6 +100,13 @@ public class SessionManager {
         return prefs.getBoolean("isDeviceOwner", false);
     }
 
+    public static void setIsDeviceOwner(Context context, boolean isOwner) {
+        SharedPreferences prefs =
+                context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+
+        prefs.edit().putBoolean("isDeviceOwner", isOwner).apply();
+    }
+
     // ✅ Logout Function
     public static void logout(Activity activity) {
         logoutWithReason(activity, null);

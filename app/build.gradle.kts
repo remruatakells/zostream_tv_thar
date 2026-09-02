@@ -24,8 +24,13 @@ android {
         applicationId = "com.buannel.studio.pvt.ltd.zostream"
         minSdk = 21
         targetSdk = 36
-        versionCode = 202936
-        versionName = "2029.3.6"
+        versionCode = 202937
+        versionName = "2029.3.7"
+        buildConfigField("boolean", "AMAZON_IAP_ENABLED", "true")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
@@ -42,6 +47,7 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.firebase.database)
+    implementation(libs.amazon.appstore.sdk)
     val composeBom = platform(libs.androidx.compose.bom)
     implementation(libs.androidx.core.ktx)
     implementation(composeBom)

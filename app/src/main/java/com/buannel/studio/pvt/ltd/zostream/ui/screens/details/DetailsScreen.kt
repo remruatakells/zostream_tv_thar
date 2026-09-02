@@ -42,6 +42,7 @@ import com.buannel.studio.pvt.ltd.zostream.model.Subscription
 import com.buannel.studio.pvt.ltd.zostream.ui.screens.AlsoLikeItems
 import com.buannel.studio.pvt.ltd.zostream.utils.FullScreenErrorDialog
 import com.buannel.studio.pvt.ltd.zostream.utils.SessionManager
+import com.buannel.studio.pvt.ltd.zostream.ads.ImageAdBanner
 
 @Composable
 fun DetailsScreen(
@@ -307,6 +308,13 @@ fun DetailsScreen(
                         }
                     }
                 }
+
+                Spacer(Modifier.height(20.dp))
+
+                ImageAdBanner(
+                    placement = "details_banner",
+                    modifier = Modifier.padding(horizontal = 40.dp)
+                )
 
                 Spacer(Modifier.height(20.dp))
 

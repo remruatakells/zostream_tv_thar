@@ -28,6 +28,8 @@ import androidx.tv.material3.Glow
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.buannel.studio.pvt.ltd.zostream.utils.QRUtils
+import com.buannel.studio.pvt.ltd.zostream.utils.AppDialog
+import com.buannel.studio.pvt.ltd.zostream.R
 import com.buannel.studio.pvt.ltd.zostream.utils.SessionManager
 import com.buannel.studio.pvt.ltd.zostream.viewmodel.QrViewModel
 
@@ -39,7 +41,8 @@ fun QrPaymentScreenUI(
     amount: Double?,
     contentType: String?,
     subscriptionId: Int?,
-    onSuccess: () -> Unit
+    onSuccess: () -> Unit,
+    onOwnerDeviceRequired: () -> Unit
 ) {
 
     val context = LocalContext.current
@@ -67,6 +70,22 @@ fun QrPaymentScreenUI(
     LaunchedEffect(viewModel.paymentSuccess) {
         if (viewModel.paymentSuccess) {
             onSuccess()
+        }
+    }
+
+    LaunchedEffect(viewModel.ownerDeviceRequired) {
+        if (viewModel.ownerDeviceRequired) {
+            AppDialog.show(
+                context,
+                R.drawable.warning,
+                "Owner Device Required",
+                viewModel.ownerDeviceMessage
+                    ?: "Only the account owner device can make a payment.",
+                false,
+                true,
+                { onOwnerDeviceRequired() },
+                null
+            )
         }
     }
 

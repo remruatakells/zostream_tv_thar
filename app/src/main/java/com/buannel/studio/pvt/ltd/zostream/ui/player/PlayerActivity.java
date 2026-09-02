@@ -7,6 +7,7 @@ import static com.buannel.studio.pvt.ltd.zostream.utils.AppDialog.show;
 
 import android.annotation.SuppressLint;
 import android.app.Dialog;
+import android.content.Intent;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -51,6 +52,8 @@ import com.buannel.studio.pvt.ltd.zostream.api.Api;
 import com.buannel.studio.pvt.ltd.zostream.model.Episode;
 import com.buannel.studio.pvt.ltd.zostream.model.Movie;
 import com.buannel.studio.pvt.ltd.zostream.model.Season;
+import com.buannel.studio.pvt.ltd.zostream.payment.AmazonIapActivity;
+import com.buannel.studio.pvt.ltd.zostream.payment.PaymentFeatureConfig;
 import com.buannel.studio.pvt.ltd.zostream.request.QrPaymentRequest;
 import com.buannel.studio.pvt.ltd.zostream.repository.SeasonRepository;
 import com.buannel.studio.pvt.ltd.zostream.repository.StreamRepository;
@@ -83,6 +86,8 @@ import retrofit2.Response;
 
 @UnstableApi
 public class PlayerActivity extends ComponentActivity {
+
+    private static final int AMAZON_IAP_REQUEST_CODE = 4201;
 
     private PlayerView playerView;
     private ExoPlayer player;
@@ -1787,7 +1792,7 @@ public class PlayerActivity extends ComponentActivity {
                     message,
                     true,
                     false,
-                    () -> generateQrPayment(isPpv, requestedEpisode, requestedMovie, requestedType),
+                    () -> startPayment(isPpv, requestedEpisode, requestedMovie, requestedType),
                     this::resumePreviousStream
             );
         } else {
@@ -1914,6 +1919,42 @@ public class PlayerActivity extends ComponentActivity {
                 showRecreateQrPaymentState("Failed");
             }
         });
+    }
+
+    private void startPayment(
+            boolean isPpv,
+            @Nullable Episode requestedEpisode,
+            @Nullable Movie requestedMovie,
+            String requestedType
+    ) {
+        if (isPpv || !PaymentFeatureConfig.isAmazonIapEnabled()) {
+            generateQrPayment(isPpv, requestedEpisode, requestedMovie, requestedType);
+            return;
+        }
+
+        pendingQrIsPpv = isPpv;
+        pendingQrEpisode = requestedEpisode;
+        pendingQrMovie = requestedMovie;
+        pendingQrType = requestedType;
+
+        Intent intent = new Intent(this, AmazonIapActivity.class);
+        startActivityForResult(intent, AMAZON_IAP_REQUEST_CODE);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode != AMAZON_IAP_REQUEST_CODE) return;
+        if (resultCode == RESULT_OK) {
+            startStream(
+                    pendingQrEpisode,
+                    pendingQrMovie,
+                    pendingQrType == null ? type : pendingQrType
+            );
+        } else {
+            resumePreviousStream();
+        }
     }
 
     private void showQrPaymentLoadingDialog() {

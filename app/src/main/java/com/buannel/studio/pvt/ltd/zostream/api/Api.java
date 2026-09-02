@@ -116,4 +116,11 @@ public class Api {
         }
         return api;
     }
+
+    public static <T> T createService(Class<T> serviceClass) {
+        if (retrofit == null) {
+            throw new IllegalStateException("Zo Stream API is unavailable until official verification returns api_base_url.");
+        }
+        return retrofit.create(serviceClass);
+    }
 }

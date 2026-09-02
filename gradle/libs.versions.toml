@@ -27,6 +27,7 @@ retrofit = "2.11.0"
 converterGson = "2.9.0"
 googleGmsGoogleServices = "4.4.4"
 firebaseDatabase = "21.0.0"
+amazonAppstoreSdk = "3.0.9"
 
 
 [libraries]
@@ -56,6 +57,7 @@ logging-interceptor = { module = "com.squareup.okhttp3:logging-interceptor", ver
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterGson" }
 firebase-database = { group = "com.google.firebase", name = "firebase-database", version.ref = "firebaseDatabase" }
+amazon-appstore-sdk = { group = "com.amazon.device", name = "amazon-appstore-sdk", version.ref = "amazonAppstoreSdk" }
 
 
 [plugins]

@@ -37,6 +37,7 @@ import com.buannel.studio.pvt.ltd.zostream.R
 import com.buannel.studio.pvt.ltd.zostream.model.Movie
 import com.buannel.studio.pvt.ltd.zostream.ui.screens.catalog.CatalogBrowserViewModel
 import com.buannel.studio.pvt.ltd.zostream.utils.SessionManager
+import com.buannel.studio.pvt.ltd.zostream.ads.ImageAdBanner
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -187,6 +188,8 @@ fun Home(
             }
         }
 
+        item { ImageAdBanner(placement = "home_top") }
+
         // =======================
         // 📂 CATEGORY LIST
         // =======================
@@ -209,6 +212,8 @@ fun Home(
 
                 Spacer(modifier = Modifier.height(6.dp))
             }
+
+            item { ImageAdBanner(placement = "home_middle") }
         }
     }
 }
