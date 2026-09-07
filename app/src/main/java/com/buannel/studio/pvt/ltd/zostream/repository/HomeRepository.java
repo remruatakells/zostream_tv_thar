@@ -6,6 +6,7 @@ import com.buannel.studio.pvt.ltd.zostream.api.Api;
 import com.buannel.studio.pvt.ltd.zostream.model.Episode;
 import com.buannel.studio.pvt.ltd.zostream.model.Movie;
 import com.buannel.studio.pvt.ltd.zostream.response.BannerResponse;
+import com.buannel.studio.pvt.ltd.zostream.response.HomeRecommendationResponse;
 import com.buannel.studio.pvt.ltd.zostream.response.WatchContinueResponse;
 import com.buannel.studio.pvt.ltd.zostream.response.WatchHistoryItem;
 import com.buannel.studio.pvt.ltd.zostream.utils.AuthHeader;
@@ -29,6 +30,45 @@ public class HomeRepository {
     public interface BannerCallback {
         void onSuccess(List<BannerResponse.Banner> data);
         void onError(String message);
+    }
+
+    public interface RecommendationHomeCallback {
+        void onSuccess(HomeRecommendationResponse data);
+        void onError(String message);
+    }
+
+    public void getRecommendationHome(
+            String token,
+            String mode,
+            boolean ageRestriction,
+            @NonNull RecommendationHomeCallback callback
+    ) {
+        Api.getApi()
+                .homeRecommendations(AuthHeader.bearer(token), mode, ageRestriction, null, 1, 10)
+                .enqueue(new Callback<HomeRecommendationResponse>() {
+                    @Override
+                    public void onResponse(
+                            Call<HomeRecommendationResponse> call,
+                            Response<HomeRecommendationResponse> response
+                    ) {
+                        HomeRecommendationResponse body = response.body();
+                        // Accept the current V4 envelope and the direct payload used by
+                        // already-deployed recommendation servers during migration.
+                        if (response.isSuccessful() && body != null && body.hasSections()) {
+                            callback.onSuccess(body);
+                        } else {
+                            String message = body != null && body.message != null
+                                    ? body.message
+                                    : "Recommendation API Error: " + response.code();
+                            callback.onError(message);
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(Call<HomeRecommendationResponse> call, Throwable throwable) {
+                        callback.onError(throwable.getMessage());
+                    }
+                });
     }
 
     public void getBanners(@NonNull BannerCallback callback) {

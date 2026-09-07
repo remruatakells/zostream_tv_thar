@@ -36,6 +36,10 @@ fun MovieCard(
     cardModifier: Modifier = Modifier,
     onClick: (Movie) -> Unit = {}
 ) {
+    // AI and catalog responses both expose cover_img. Fall back only for older
+    // catalog records that have not yet been backfilled with a cover image.
+    val imageUrl = movie.coverImg?.takeIf { it.isNotBlank() } ?: movie.poster
+
     Column(
         modifier = modifier.width(236.dp)
     ) {
@@ -60,7 +64,7 @@ fun MovieCard(
         ) {
             Box {
                 AsyncImage(
-                    model = movie.coverImg,
+                    model = imageUrl,
                     contentDescription = movie.description,
                     placeholder = painterResource(id = R.drawable.placeholder),
                     contentScale = ContentScale.Crop,

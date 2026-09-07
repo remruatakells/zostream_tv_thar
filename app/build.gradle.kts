@@ -26,7 +26,7 @@ android {
         targetSdk = 36
         versionCode = 202937
         versionName = "2029.3.7"
-        buildConfigField("boolean", "AMAZON_IAP_ENABLED", "true")
+        buildConfigField("boolean", "AMAZON_IAP_ENABLED", "false")
     }
 
     buildFeatures {

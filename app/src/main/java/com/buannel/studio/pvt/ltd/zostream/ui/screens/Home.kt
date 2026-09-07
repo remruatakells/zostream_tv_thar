@@ -200,20 +200,29 @@ fun Home(
             }
 
         } else {
+            val homeMiddleAdIndex = categoryList.size / 2
 
-            items(categoryList) { category ->
+            categoryList.forEachIndexed { index, category ->
+                item(key = "home-section-${category.id}") {
+                    CategoryRow(
+                        sectionId = category.id,
+                        categoryName = category.name,
+                        movies = category.movieList,
+                        onMovieSelected = onMovieSelected,
+                        onViewAll = onCategoryViewAll
+                    )
 
-                CategoryRow(
-                    categoryName = category.name,
-                    movies = category.movieList,
-                    onMovieSelected = onMovieSelected,
-                    onViewAll = onCategoryViewAll
-                )
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                // It must be its own lazy-list item: placing it inside a
+                // category item's content can keep its async image unmeasured.
+                if (categoryList.size > 1 && index + 1 == homeMiddleAdIndex) {
+                    item(key = "home-middle-ad") {
+                        ImageAdBanner(placement = "home_middle")
+                    }
+                }
             }
-
-            item { ImageAdBanner(placement = "home_middle") }
         }
     }
 }

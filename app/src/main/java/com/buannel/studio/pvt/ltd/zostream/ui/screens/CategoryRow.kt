@@ -30,6 +30,7 @@ import com.buannel.studio.pvt.ltd.zostream.ui.components.tvFocusedItemBorder
 
 @Composable
 fun CategoryRow(
+    sectionId: String,
     categoryName: String,
     movies: List<Movie>,
     onMovieSelected: (Movie) -> Unit,
@@ -58,10 +59,11 @@ fun CategoryRow(
                 )
             }
 
-            if (!categoryName.equals("Continue Watching", ignoreCase = true)) {
+            if (!sectionId.equals("continue_watching", ignoreCase = true) &&
+                !categoryName.equals("Continue Watching", ignoreCase = true)) {
                 item {
                     ViewAllCard(
-                        onClick = { onViewAll(categoryName) }
+                        onClick = { onViewAll(sectionId) }
                     )
                 }
             }

@@ -2,6 +2,7 @@ package com.buannel.studio.pvt.ltd.zostream
 
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
+import android.content.res.ColorStateList
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -13,11 +14,15 @@ import android.content.pm.Signature
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
+import android.widget.ProgressBar
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +31,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -39,8 +45,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.view.WindowCompat
@@ -59,6 +68,7 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import dagger.hilt.android.AndroidEntryPoint
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicBoolean
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -79,38 +89,20 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         applyCachedOfficialConfig()
+        showSplashScreen()
+        startOfficialVerification()
+    }
+
+    private fun showSplashScreen() {
         setContent {
             TvComposeIntroductionTheme {
-                SilentSplashScreen()
+                SplashScreen()
             }
         }
+    }
 
-        verifyOfficialClientFromFirebase(silent = false) { result ->
-            if (!result.accepted) {
-                if (!result.networkIssue) {
-                    clearOfficialConfigCache()
-                }
-                setContent {
-                    TvComposeIntroductionTheme {
-                        if (result.networkIssue) {
-                            VerificationNetworkIssueScreen(result.message) {
-                                setContent {
-                                    TvComposeIntroductionTheme {
-                                        SilentSplashScreen()
-                                    }
-                                }
-                                verifyOfficialClientFromFirebase(silent = false) { retryResult ->
-                                    handleOfficialVerificationResult(retryResult)
-                                }
-                            }
-                        } else {
-                            VerificationBlockedScreen(result.message)
-                        }
-                    }
-                }
-                return@verifyOfficialClientFromFirebase
-            }
-
+    private fun startOfficialVerification() {
+        verifyOfficialClientFromFirebase { result ->
             handleOfficialVerificationResult(result)
         }
     }
@@ -124,14 +116,8 @@ class MainActivity : ComponentActivity() {
                 TvComposeIntroductionTheme {
                     if (result.networkIssue) {
                         VerificationNetworkIssueScreen(result.message) {
-                            setContent {
-                                TvComposeIntroductionTheme {
-                                    SilentSplashScreen()
-                                }
-                            }
-                            verifyOfficialClientFromFirebase(silent = false) { retryResult ->
-                                handleOfficialVerificationResult(retryResult)
-                            }
+                            showSplashScreen()
+                            startOfficialVerification()
                         }
                     } else {
                         VerificationBlockedScreen(result.message)
@@ -250,18 +236,45 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun verifyOfficialClientFromFirebase(
-        silent: Boolean,
-        onResult: (OfficialClientVerificationResult) -> Unit
-    ) {
+    private fun verifyOfficialClientFromFirebase(onResult: (OfficialClientVerificationResult) -> Unit) {
+        if (!hasUsableNetwork()) {
+            onResult(
+                OfficialClientVerificationResult(
+                    accepted = false,
+                    message = "No internet connection. Please check your network and try again.",
+                    networkIssue = true
+                )
+            )
+            return
+        }
+
+        val completed = AtomicBoolean(false)
+        val mainHandler = Handler(Looper.getMainLooper())
+        fun finish(result: OfficialClientVerificationResult) {
+            if (completed.compareAndSet(false, true)) {
+                mainHandler.removeCallbacksAndMessages(null)
+                onResult(result)
+            }
+        }
+
+        mainHandler.postDelayed({
+            finish(
+                OfficialClientVerificationResult(
+                    accepted = false,
+                    message = "Connection timed out. Please check your network and try again.",
+                    networkIssue = true
+                )
+            )
+        }, OFFICIAL_VERIFICATION_TIMEOUT_MS)
+
         FirebaseDatabase.getInstance()
             .getReference("official_client_configs/android-tv")
             .get()
             .addOnSuccessListener { snapshot ->
-                onResult(evaluateOfficialConfigs(snapshot))
+                finish(evaluateOfficialConfigs(snapshot))
             }
             .addOnFailureListener { error ->
-                onResult(
+                finish(
                     OfficialClientVerificationResult(
                         accepted = false,
                         message = networkIssueMessage(error),
@@ -434,6 +447,7 @@ class MainActivity : ComponentActivity() {
         const val KEY_API_BASE_URL = "api_base_url"
         const val KEY_API_VERSION = "api_version"
         const val DEBUG_EMULATOR_API_BASE_URL = "http://10.0.2.2:8000/"
+        const val OFFICIAL_VERIFICATION_TIMEOUT_MS = 15_000L
     }
 }
 
@@ -448,7 +462,7 @@ private data class OfficialClientVerificationResult(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun SilentSplashScreen() {
+private fun SplashScreen() {
     Surface(
         shape = RectangleShape,
         modifier = Modifier.fillMaxSize()
@@ -459,7 +473,29 @@ private fun SilentSplashScreen() {
                 .background(Color(0xFF05070D)),
             contentAlignment = Alignment.Center
         ) {
-            Spacer(modifier = Modifier.height(1.dp))
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(22.dp)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.icon_transparent),
+                    contentDescription = "Zo Stream",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(164.dp)
+                )
+                AndroidView(
+                    factory = { context ->
+                        ProgressBar(context).apply {
+                            indeterminateTintList = ColorStateList.valueOf(android.graphics.Color.WHITE)
+                        }
+                    },
+                    modifier = Modifier.size(42.dp)
+                )
+                Text(
+                    text = "Loading Zo Stream…",
+                    color = Color.White.copy(alpha = 0.72f)
+                )
+            }
         }
     }
 }

@@ -9,6 +9,7 @@ import com.buannel.studio.pvt.ltd.zostream.request.QrPaymentRequest
 import com.buannel.studio.pvt.ltd.zostream.response.ApiResponse
 import com.buannel.studio.pvt.ltd.zostream.response.BannerResponse
 import com.buannel.studio.pvt.ltd.zostream.response.CheckPpvRentalResponse
+import com.buannel.studio.pvt.ltd.zostream.response.HomeRecommendationResponse
 import com.buannel.studio.pvt.ltd.zostream.response.MovieDetailsResponse
 import com.buannel.studio.pvt.ltd.zostream.response.MovieFilterResponse
 import com.buannel.studio.pvt.ltd.zostream.response.QrLoginResponse
@@ -75,6 +76,16 @@ interface ApiInterface {
         @Query("age_restriction") ageRestriction: Boolean,
         @Query("user_id") uid: String,
     ): Call<Map<String, List<Movie>>>
+
+    @GET("api/v4/recommendations/home")
+    fun homeRecommendations(
+        @Header("Authorization") bearerToken: String,
+        @Header("X-Mode") mode: String,
+        @Query("age_restriction") ageRestriction: Boolean,
+        @Query("section") section: String?,
+        @Query("page") page: Int,
+        @Query("per_page") perPage: Int,
+    ): Call<HomeRecommendationResponse>
 
     @GET("api/v4/catalog/items/{contentId}/details")
     fun getDetails(

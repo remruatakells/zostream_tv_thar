@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import com.buannel.studio.pvt.ltd.zostream.api.Api
 import com.buannel.studio.pvt.ltd.zostream.model.Movie
 import com.buannel.studio.pvt.ltd.zostream.response.MovieFilterResponse
+import com.buannel.studio.pvt.ltd.zostream.response.HomeRecommendationResponse
 import com.buannel.studio.pvt.ltd.zostream.utils.AuthHeader
 import retrofit2.Call
 import retrofit2.Callback
@@ -64,6 +65,11 @@ class MovieBrowserViewModel : ViewModel() {
             isLoading.value = true
         }
 
+        if (category in RECOMMENDATION_SECTIONS) {
+            loadRecommendationPage(page, append)
+            return
+        }
+
         Api.getApi().getMovie(
             AuthHeader.bearer(token),
             ageRestriction,
@@ -100,5 +106,62 @@ class MovieBrowserViewModel : ViewModel() {
                 error.value = t.message ?: "Unable to load movies"
             }
         })
+    }
+
+    private fun loadRecommendationPage(page: Int, append: Boolean) {
+        val contentMode = if (isChildMode) "kids" else "adult"
+        Api.getApi().homeRecommendations(
+            AuthHeader.bearer(token),
+            contentMode,
+            ageRestriction,
+            category,
+            page,
+            PAGE_SIZE
+        ).enqueue(object : Callback<HomeRecommendationResponse> {
+            override fun onResponse(
+                call: Call<HomeRecommendationResponse>,
+                response: Response<HomeRecommendationResponse>
+            ) {
+                requestInFlight = false
+                isLoading.value = false
+                isLoadingMore.value = false
+
+                val body = response.body()
+                val section = body?.getSection(category)
+                // Production may return either a V4 envelope or the direct
+                // recommendation payload, so do not require envelope.success.
+                if (!response.isSuccessful || body == null || !body.hasSections() || section == null) {
+                    error.value = body?.message ?: "Recommendation API Error: ${response.code()}"
+                    return
+                }
+
+                currentPage = section.pagination?.currentPage ?: page
+                lastPage = if (section.pagination?.hasMore == true) Int.MAX_VALUE else currentPage
+                val newMovies = section.publishedMovies()
+                movies.value = if (append) movies.value + newMovies else newMovies
+            }
+
+            override fun onFailure(call: Call<HomeRecommendationResponse>, throwable: Throwable) {
+                requestInFlight = false
+                isLoading.value = false
+                isLoadingMore.value = false
+                error.value = throwable.message ?: "Unable to load recommendations"
+            }
+        })
+    }
+
+    private companion object {
+        const val PAGE_SIZE = 20
+        val RECOMMENDATION_SECTIONS = setOf(
+            "latest_update",
+            "continue_watching",
+            "because_you_watched",
+            "top_picks_for_you",
+            "similar_movies",
+            "trending_now",
+            "new_releases",
+            "your_wishlist",
+            "next_episode"
+        )
     }
 }
