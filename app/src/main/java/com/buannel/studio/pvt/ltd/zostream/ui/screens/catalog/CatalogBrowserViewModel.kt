@@ -65,14 +65,24 @@ class CatalogBrowserViewModel @Inject constructor() : ViewModel() {
             object : HomeRepository.RecommendationHomeCallback {
 
                 override fun onSuccess(data: HomeRecommendationResponse) {
-                    val categories = RECOMMENDATION_SECTION_ORDER.mapNotNull { sectionId ->
+                    val layout = data.sectionOrder.takeIf { it.isNotEmpty() }
+                        ?: RECOMMENDATION_SECTION_ORDER.mapIndexed { position, key ->
+                            HomeRecommendationResponse.SectionDefinition().apply {
+                                this.key = key
+                                this.position = position
+                            }
+                        }
+                    val categories = layout.mapNotNull { definition ->
+                        val sectionId = definition.key ?: return@mapNotNull null
                         val section = data.getSection(sectionId) ?: return@mapNotNull null
                         val movies = section.publishedMovies()
                         if (movies.isEmpty()) return@mapNotNull null
 
                         Category(
                             id = sectionId,
-                            name = recommendationTitle(sectionId, section),
+                            name = definition.title
+                                ?.takeIf { it.isNotBlank() }
+                                ?: recommendationTitle(sectionId, section),
                             movieList = movies
                         )
                     }

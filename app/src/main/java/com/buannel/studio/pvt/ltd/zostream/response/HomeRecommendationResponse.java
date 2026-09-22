@@ -22,6 +22,7 @@ public class HomeRecommendationResponse {
     // Compatibility fields for a direct (non-enveloped) recommendation payload.
     public String user;
     @SerializedName("history_size") public int historySize;
+    @SerializedName("section_order") public List<SectionDefinition> sectionOrder;
     public Map<String, Section> sections;
 
     public Section getSection(String key) {
@@ -35,6 +36,13 @@ public class HomeRecommendationResponse {
         return (data != null && data.sections != null) || sections != null;
     }
 
+    public List<SectionDefinition> getSectionOrder() {
+        List<SectionDefinition> order = data != null && data.sectionOrder != null
+                ? data.sectionOrder
+                : sectionOrder;
+        return order == null ? Collections.emptyList() : order;
+    }
+
     public static class Data {
         public String user;
 
@@ -44,7 +52,16 @@ public class HomeRecommendationResponse {
         @SerializedName("content_mode")
         public String contentMode;
 
+        @SerializedName("section_order")
+        public List<SectionDefinition> sectionOrder;
+
         public Map<String, Section> sections;
+    }
+
+    public static class SectionDefinition {
+        public String key;
+        public String title;
+        public int position;
     }
 
     public static class ApiError {

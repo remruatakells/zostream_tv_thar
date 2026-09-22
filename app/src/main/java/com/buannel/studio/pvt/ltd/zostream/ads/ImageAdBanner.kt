@@ -33,6 +33,7 @@ import com.buannel.studio.pvt.ltd.zostream.api.Api
 import com.buannel.studio.pvt.ltd.zostream.ui.screens.tvDpadClick
 import com.buannel.studio.pvt.ltd.zostream.utils.DeviceUtils
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 
 @Composable
@@ -110,21 +111,23 @@ fun ImageAdBanner(placement: String, modifier: Modifier = Modifier) {
             .tvDpadClick {
                 scope.launch {
                     ensureImpression()?.let { viewedId ->
-                        runCatching {
-                            service?.record(
-                                AdEventRequest(
-                                    trackingToken = currentAd.trackingToken,
-                                    eventId = UUID.randomUUID().toString(),
-                                    event = "click",
-                                    impressionEventId = viewedId,
-                                    deviceId = DeviceUtils.getDeviceId(context)
+                        withTimeoutOrNull(1_500) {
+                            runCatching {
+                                service?.record(
+                                    AdEventRequest(
+                                        trackingToken = currentAd.trackingToken,
+                                        eventId = UUID.randomUUID().toString(),
+                                        event = "click",
+                                        impressionEventId = viewedId,
+                                        deviceId = DeviceUtils.getDeviceId(context)
+                                    )
                                 )
-                            )
-                        }
+                            }
                         }
                     }
-                (currentAd.targetUrl ?: currentAd.adUrl)?.takeIf { it.isNotBlank() }?.let {
-                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
+                    (currentAd.targetUrl ?: currentAd.adUrl)?.takeIf { it.isNotBlank() }?.let {
+                        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(it))) }
+                    }
                 }
             }
     ) {

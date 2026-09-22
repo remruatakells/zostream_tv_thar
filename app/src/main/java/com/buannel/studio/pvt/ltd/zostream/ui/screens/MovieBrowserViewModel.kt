@@ -65,7 +65,7 @@ class MovieBrowserViewModel : ViewModel() {
             isLoading.value = true
         }
 
-        if (category in RECOMMENDATION_SECTIONS) {
+        if (category in RECOMMENDATION_SECTIONS || category.startsWith("custom_")) {
             loadRecommendationPage(page, append)
             return
         }
