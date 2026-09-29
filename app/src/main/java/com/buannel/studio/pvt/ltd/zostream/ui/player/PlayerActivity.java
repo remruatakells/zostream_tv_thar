@@ -14,6 +14,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -48,6 +49,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.buannel.studio.pvt.ltd.zostream.R;
 import com.buannel.studio.pvt.ltd.zostream.adapter.PlaylistAdapter;
+import com.buannel.studio.pvt.ltd.zostream.ads.ImageAd;
+import com.buannel.studio.pvt.ltd.zostream.ads.VideoAdController;
 import com.buannel.studio.pvt.ltd.zostream.api.Api;
 import com.buannel.studio.pvt.ltd.zostream.model.Episode;
 import com.buannel.studio.pvt.ltd.zostream.model.Movie;
@@ -72,6 +75,7 @@ import com.google.firebase.database.ValueEventListener;
 import com.google.gson.JsonObject;
 
 import java.util.ArrayList;
+import java.io.Serializable;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -91,6 +95,22 @@ public class PlayerActivity extends ComponentActivity {
 
     private PlayerView playerView;
     private ExoPlayer player;
+    private VideoAdController videoAds;
+    private boolean preRollRequested;
+    private boolean midRollPlayed;
+    private boolean postRollPlayed;
+    private boolean initialAdDecisionPending;
+    private final Handler adPositionHandler = new Handler(Looper.getMainLooper());
+    private final Runnable adPositionCheck = new Runnable() {
+        @Override
+        public void run() {
+            if (player != null && player.isPlaying()
+                    && videoAds != null && !videoAds.isPlaying()) {
+                maybePlayMidRoll();
+            }
+            adPositionHandler.postDelayed(this, 1000L);
+        }
+    };
     private DefaultTrackSelector trackSelector;
     private DefaultTimeBar seekBar;
 
@@ -153,6 +173,7 @@ public class PlayerActivity extends ComponentActivity {
 
         setPlayerScreenAwake(true);
         setContentView(R.layout.activity_player);
+        videoAds = new VideoAdController(this, findViewById(R.id.main));
 
         // 🔥 Get data
         streamUrl = getIntent().getStringExtra("streamUrl");
@@ -166,6 +187,16 @@ public class PlayerActivity extends ComponentActivity {
         isEpisode = getIntent().getBooleanExtra("isEpisode", false);
         currentEpisodeNumber = getIntent().getIntExtra("episode", 0);
         watchPosition = parseWatchPosition(getIntent().getStringExtra("watchPosition"));
+        Serializable streamAds = getIntent().getSerializableExtra("stream_ads");
+        if (streamAds instanceof HashMap<?, ?>) {
+            HashMap<String, ImageAd> ads = new HashMap<>();
+            for (Map.Entry<?, ?> entry : ((HashMap<?, ?>) streamAds).entrySet()) {
+                if (entry.getKey() instanceof String && entry.getValue() instanceof ImageAd) {
+                    ads.put((String) entry.getKey(), (ImageAd) entry.getValue());
+                }
+            }
+            videoAds.setPlannedAds(ads);
+        }
 
         // 🎬 Views
         playerView = findViewById(R.id.playerView);
@@ -233,6 +264,7 @@ public class PlayerActivity extends ComponentActivity {
 
         // 🔥 Init player
         initPlayer(watchPosition);
+        adPositionHandler.post(adPositionCheck);
     }
 
     private void setPlayerScreenAwake(boolean enabled) {
@@ -725,6 +757,15 @@ public class PlayerActivity extends ComponentActivity {
 
                 if (state == Player.STATE_READY) {
                     playbackDuration = getSafeDuration();
+                    if (initialAdDecisionPending) {
+                        initialAdDecisionPending = false;
+                        maybePlayAdForCurrentPosition();
+                    }
+                } else if (state == Player.STATE_ENDED) {
+                    if (!postRollPlayed && videoAds != null) {
+                        postRollPlayed = true;
+                        videoAds.play("post_roll", null);
+                    }
                 }
             }
 
@@ -732,6 +773,7 @@ public class PlayerActivity extends ComponentActivity {
             public void onIsPlayingChanged(boolean isPlaying) {
 
                 animatePlayPause(isPlaying);
+                if (isPlaying && !initialAdDecisionPending) maybePlayAdForCurrentPosition();
             }
 
             @Override
@@ -1003,8 +1045,45 @@ public class PlayerActivity extends ComponentActivity {
         }
 
         player.setPlayWhenReady(true);
+        initialAdDecisionPending = true;
         player.prepare();
         player.play();
+    }
+
+    private void maybePlayAdForCurrentPosition() {
+        if (videoAds == null || videoAds.isPlaying() || player == null) return;
+
+        long duration = player.getDuration();
+        if (duration > 0 && player.getCurrentPosition() >= duration / 2) {
+            if (videoAds.hasPlannedAd("mid_roll")) {
+                maybePlayMidRoll();
+            } else {
+                maybePlayPreRoll();
+            }
+        } else {
+            maybePlayPreRoll();
+        }
+    }
+
+    private void maybePlayPreRoll() {
+        if (preRollRequested || videoAds == null || videoAds.isPlaying()) return;
+        preRollRequested = true;
+        if (player != null) player.pause();
+        videoAds.play("pre_roll", this::resumeContentAfterAd);
+    }
+
+    private void maybePlayMidRoll() {
+        if (midRollPlayed || videoAds == null || videoAds.isPlaying() || player == null) return;
+        long duration = player.getDuration();
+        if (duration <= 0 || player.getCurrentPosition() < duration / 2
+                || !videoAds.hasPlannedAd("mid_roll")) return;
+        midRollPlayed = true;
+        player.pause();
+        videoAds.play("mid_roll", this::resumeContentAfterAd);
+    }
+
+    private void resumeContentAfterAd() {
+        if (player != null) player.play();
     }
 
     private long parseWatchPosition(@Nullable String value) {
@@ -1694,6 +1773,11 @@ public class PlayerActivity extends ComponentActivity {
                 streamToken = result.streamToken;
                 maxQuality = result.maxQuality;
                 watchPosition = result.watch_position != null ? result.watch_position : 0L;
+                preRollRequested = false;
+                midRollPlayed = false;
+                postRollPlayed = false;
+                initialAdDecisionPending = false;
+                videoAds.setPlannedAds(result.ads);
 
                 if (type.equals("movie")) {
                     isEpisode = false;
@@ -2209,6 +2293,7 @@ public class PlayerActivity extends ComponentActivity {
         super.onPause();
         setPlayerScreenAwake(false);
         if (player != null) player.pause();
+        if (videoAds != null) videoAds.pause();
     }
 
     @Override
@@ -2218,6 +2303,9 @@ public class PlayerActivity extends ComponentActivity {
         if (player != null) {
             watchPosition = player.getCurrentPosition();
         }
+
+        adPositionHandler.removeCallbacksAndMessages(null);
+        if (videoAds != null) videoAds.release();
 
         stopStreamApi(watchPosition);
 
@@ -2235,5 +2323,6 @@ public class PlayerActivity extends ComponentActivity {
     protected void onResume() {
         super.onResume();
         setPlayerScreenAwake(true);
+        if (videoAds != null) videoAds.resume();
     }
 }

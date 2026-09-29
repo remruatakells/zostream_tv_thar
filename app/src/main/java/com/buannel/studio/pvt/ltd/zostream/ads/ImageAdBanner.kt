@@ -32,6 +32,7 @@ import coil.request.ImageRequest
 import com.buannel.studio.pvt.ltd.zostream.api.Api
 import com.buannel.studio.pvt.ltd.zostream.ui.screens.tvDpadClick
 import com.buannel.studio.pvt.ltd.zostream.utils.DeviceUtils
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
@@ -43,29 +44,40 @@ fun ImageAdBanner(placement: String, modifier: Modifier = Modifier) {
     var ad by remember(placement) { mutableStateOf<ImageAd?>(null) }
     var focused by remember { mutableStateOf(false) }
     var impressionId by remember(ad?.trackingToken) { mutableStateOf<String?>(null) }
-    val service = remember { runCatching { Api.createService(AdApi::class.java) }.getOrNull() }
+    var service by remember { mutableStateOf<AdApi?>(null) }
 
-    LaunchedEffect(placement, service) {
-        if (service == null) {
-            Log.w("ZoStreamAds", "Ad API is unavailable for $placement")
-            return@LaunchedEffect
-        }
-
-        val result = runCatching { service.serve(placement) }
-        result.exceptionOrNull()?.let {
-            Log.w("ZoStreamAds", "Ad request failed for $placement", it)
-        }
-        val response = result.getOrNull()
-        Log.d(
-            "ZoStreamAds",
-            "Ad response placement=$placement success=${response?.success} campaign=${response?.servedAd()?.campaignId}"
-        )
-        ad = response
-            ?.servedAd()
-            ?.takeIf {
-                it.type.equals("image", ignoreCase = true) &&
-                    listOf(it.mediaUrl, it.proxyMediaUrl, it.thumbnailUrl).any { url -> !url.isNullOrBlank() }
+    LaunchedEffect(placement) {
+        repeat(4) { attempt ->
+            val currentService = service
+                ?: runCatching { Api.createService(AdApi::class.java) }
+                    .getOrNull()
+                    ?.also { service = it }
+            if (currentService == null) {
+                if (attempt < 3) delay(2_000L)
+                return@repeat
             }
+
+            val result = runCatching { currentService.serve(placement) }
+            result.exceptionOrNull()?.let {
+                Log.w("ZoStreamAds", "Ad request failed for $placement", it)
+            }
+            val response = result.getOrNull()
+            if (response != null) {
+                Log.d(
+                    "ZoStreamAds",
+                    "Ad response placement=$placement success=${response.success} campaign=${response.servedAd()?.campaignId}"
+                )
+                ad = response
+                    .servedAd()
+                    ?.takeIf {
+                        it.type.equals("image", ignoreCase = true) &&
+                            listOf(it.mediaUrl, it.proxyMediaUrl, it.thumbnailUrl).any { url -> !url.isNullOrBlank() }
+                    }
+                return@LaunchedEffect
+            }
+            if (attempt < 3) delay(2_000L)
+        }
+        Log.w("ZoStreamAds", "Ad API remained unavailable for $placement")
     }
 
     val currentAd = ad ?: return
@@ -86,10 +98,10 @@ fun ImageAdBanner(placement: String, modifier: Modifier = Modifier) {
     }
     suspend fun ensureImpression(): String? {
         impressionId?.let { return it }
-        if (service == null) return null
+        val currentService = service ?: return null
         val id = UUID.randomUUID().toString().also { impressionId = it }
         runCatching {
-            service.record(
+            currentService.record(
                 AdEventRequest(
                     trackingToken = currentAd.trackingToken,
                     eventId = id,

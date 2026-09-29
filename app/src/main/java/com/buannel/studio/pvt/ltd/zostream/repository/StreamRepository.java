@@ -7,10 +7,14 @@ import androidx.annotation.OptIn;
 import androidx.media3.common.util.UnstableApi;
 
 import com.buannel.studio.pvt.ltd.zostream.api.Api;
+import com.buannel.studio.pvt.ltd.zostream.ads.ImageAd;
 import com.buannel.studio.pvt.ltd.zostream.response.StreamResult;
 import com.buannel.studio.pvt.ltd.zostream.utils.AuthHeader;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+
+import java.util.HashMap;
+import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -46,6 +50,8 @@ public class StreamRepository {
         body.addProperty("type", type);
         body.addProperty("season_id", seasonId);
         body.addProperty("subscription_id", subscriptionId);
+        body.addProperty("platform", "android-tv");
+        body.addProperty("device_type", "tv");
 
         Api.getApi().startStream(AuthHeader.bearer(accessToken), deviceId, body)
                 .enqueue(new Callback<JsonObject>() {
@@ -80,6 +86,16 @@ public class StreamRepository {
                             Long watchPosition = res.has("watch_position") && !res.get("watch_position").isJsonNull()
                                     ? res.get("watch_position").getAsLong()
                                     : null;
+                            HashMap<String, ImageAd> ads = new HashMap<>();
+                            if (res.has("ads") && res.get("ads").isJsonObject()) {
+                                for (Map.Entry<String, com.google.gson.JsonElement> entry
+                                        : res.getAsJsonObject("ads").entrySet()) {
+                                    ImageAd ad = new Gson().fromJson(entry.getValue(), ImageAd.class);
+                                    if (ad != null && "video".equalsIgnoreCase(ad.getType())) {
+                                        ads.put(entry.getKey(), ad);
+                                    }
+                                }
+                            }
 
                             if (movieLinks != null && movieLinks.has("links") && !movieLinks.get("links").isJsonNull()) {
                                 try {
@@ -90,7 +106,7 @@ public class StreamRepository {
                             }
 
                             if (streamUrl != null && !streamUrl.trim().isEmpty()) {
-                                callback.onSuccess(new StreamResult(streamUrl, streamToken, maxQuality, watchPosition));
+                                callback.onSuccess(new StreamResult(streamUrl, streamToken, maxQuality, watchPosition, ads));
                             } else {
                                 callback.onError("Stream Error", "No stream URL found");
                             }

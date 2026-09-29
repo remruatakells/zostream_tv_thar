@@ -38,6 +38,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.buannel.studio.pvt.ltd.zostream.R
+import com.buannel.studio.pvt.ltd.zostream.ads.ImageAd
 import com.buannel.studio.pvt.ltd.zostream.api.Api
 import com.buannel.studio.pvt.ltd.zostream.ui.components.QrPaymentScreenUI
 import com.buannel.studio.pvt.ltd.zostream.ui.components.AmazonIapPaymentScreen
@@ -296,6 +297,8 @@ fun App(
                         addProperty("user_id", userId)
                         addProperty("season_id", seasonId)
                         addProperty("type", type)
+                        addProperty("platform", "android-tv")
+                        addProperty("device_type", "tv")
                     }
 
                     Api.getApi().startStream(
@@ -450,6 +453,16 @@ fun App(
                                     else
                                         ""
 
+                                val streamAds = hashMapOf<String, ImageAd>()
+                                if (res.has("ads") && res.get("ads").isJsonObject) {
+                                    res.getAsJsonObject("ads").entrySet().forEach { (placement, value) ->
+                                        runCatching { Gson().fromJson(value, ImageAd::class.java) }
+                                            .getOrNull()
+                                            ?.takeIf { it.type.equals("video", ignoreCase = true) }
+                                            ?.let { streamAds[placement] = it }
+                                    }
+                                }
+
                                 if (!streamUrl.isNullOrEmpty()) {
 
                                     val intent = Intent(context, PlayerActivity::class.java)
@@ -467,6 +480,7 @@ fun App(
                                     intent.putExtra("maxQuality", maxQuality)
                                     intent.putExtra("type", type)
                                     intent.putExtra("isEpisode", type == "episode")
+                                    intent.putExtra("stream_ads", streamAds)
 
                                     context.startActivity(intent)
 

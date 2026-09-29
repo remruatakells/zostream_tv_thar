@@ -1,6 +1,7 @@
 package com.buannel.studio.pvt.ltd.zostream.ads
 
 import com.google.gson.annotations.SerializedName
+import java.io.Serializable
 
 data class AdEnvelope<T>(
     val success: Boolean = false,
@@ -51,15 +52,20 @@ data class ImageAd(
     @SerializedName("campaign_id") val campaignId: Long,
     @SerializedName("creative_id") val creativeId: Long,
     val name: String? = null,
+    val description: String? = null,
+    @SerializedName("advertiser_name") val advertiserName: String? = null,
     val type: String = "",
     @SerializedName("media_url") val mediaUrl: String? = null,
     @SerializedName("thumbnail_url") val thumbnailUrl: String? = null,
     @SerializedName("proxy_media_url") val proxyMediaUrl: String? = null,
     @SerializedName("target_url") val targetUrl: String? = null,
     @SerializedName("ad_url") val adUrl: String? = null,
+    @SerializedName("duration_seconds") val durationSeconds: Int? = null,
+    @SerializedName("skip_after_seconds") val skipAfterSeconds: Int? = null,
+    @SerializedName("is_skippable") val isSkippable: Boolean? = null,
     val placement: String = "",
     @SerializedName("tracking_token") val trackingToken: String = ""
-)
+) : Serializable
 
 data class AdEventRequest(
     @SerializedName("tracking_token") val trackingToken: String,
