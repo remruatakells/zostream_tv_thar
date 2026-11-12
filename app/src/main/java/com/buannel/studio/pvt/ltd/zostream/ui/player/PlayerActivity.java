@@ -736,7 +736,7 @@ public class PlayerActivity extends ComponentActivity {
         audioSelectionTouched = false;
         updateAudioTrackButtonVisibility();
 
-        trackSelector = new DefaultTrackSelector(this);
+        trackSelector = new com.buannel.studio.pvt.ltd.zostream.player.BufferedQualitySelector(this);
         player = new ExoPlayer.Builder(this)
                 .setTrackSelector(trackSelector)
                 .build();
@@ -1494,6 +1494,8 @@ public class PlayerActivity extends ComponentActivity {
         if (player == null) {
             return 0;
         }
+        Format displayed = player.getVideoFormat();
+        if (displayed != null && displayed.height > 0) return displayed.height;
 
         Tracks tracks = player.getCurrentTracks();
         for (Tracks.Group group : tracks.getGroups()) {
@@ -1538,6 +1540,9 @@ public class PlayerActivity extends ComponentActivity {
 
     private void setAutoQuality() {
         selectedQualityHeight = 0;
+        if (trackSelector instanceof com.buannel.studio.pvt.ltd.zostream.player.BufferedQualitySelector) {
+            ((com.buannel.studio.pvt.ltd.zostream.player.BufferedQualitySelector) trackSelector).selectAuto();
+        }
         DefaultTrackSelector.Parameters.Builder builder = trackSelector.buildUponParameters()
                 .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
                 .clearVideoSizeConstraints()
@@ -1554,6 +1559,12 @@ public class PlayerActivity extends ComponentActivity {
         }
 
         selectedQualityHeight = option.height;
+        if (trackSelector instanceof com.buannel.studio.pvt.ltd.zostream.player.BufferedQualitySelector) {
+            com.buannel.studio.pvt.ltd.zostream.player.BufferedQualitySelector selector =
+                    (com.buannel.studio.pvt.ltd.zostream.player.BufferedQualitySelector) trackSelector;
+            if (selector.selectFixed(player, option.group.getMediaTrackGroup(), option.trackIndex)) return;
+            selector.selectAuto();
+        }
         trackSelector.setParameters(
                 trackSelector.buildUponParameters()
                         .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
@@ -1565,6 +1576,7 @@ public class PlayerActivity extends ComponentActivity {
                                 )
                         )
         );
+        com.buannel.studio.pvt.ltd.zostream.player.BufferedQualitySelector.restartForUpgrade(player, option.height);
     }
 
     private void applyMaxQualityConstraint(DefaultTrackSelector.Parameters.Builder builder) {
